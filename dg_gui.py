@@ -4,12 +4,19 @@ Python script to present a Disc Golf GUI, that allows
 us to keep track of courses and holes on that course
 
 TO DO:
+    - Finish creating the "Show" window
+      - Ensure that only one window per course can be popped up
+        (should it be modal?)
+    - Check for options (e.g. "--debug|-d") at startup
+    - Put support stuff in library files?
+    - Properly package for distribution
     - Figure out how to save state when quitting, i.e.
       the "current" DB, course, hole, and perhaps other
       preferences -- might need a ~/.dg file?
     - Add "Are you sure" popup if DB is modified
     - Add catching window close event
     - DB: persist in a real file
+    - Add pictures to DB some day?
 
 History:
     Version 1.0: menu bar present, hooked up, but on
@@ -49,9 +56,9 @@ class AutoWidthListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin):
         ListCtrlAutoWidthMixin.__init__(self)
 
 
-class MyFrame(wx.Frame):
+class DBMainFrame(wx.Frame):
     def __init__(self, *args, **kwargs):
-        super(MyFrame, self).__init__(*args, **kwargs)
+        super(DBMainFrame, self).__init__(*args, **kwargs)
         self.SetSize((700, 300))
         self.InitUI()
 
@@ -73,11 +80,11 @@ class MyFrame(wx.Frame):
         fileMenu.AppendItem(odbmi)
         self.Bind(wx.EVT_MENU, self.OnDBOpen, odbmi, DB_OPEN_BIND_ID)
 
-        self.SaveDbMenuItem = wx.MenuItem(fileMenu, wx.ID_SAVE, '&Save DB')
-        fileMenu.AppendItem(self.SaveDbMenuItem)
-        self.Bind(wx.EVT_MENU, self.OnDBSave, self.SaveDbMenuItem,
+        self.SaveDBMenuItem = wx.MenuItem(fileMenu, wx.ID_SAVE, '&Save DB')
+        fileMenu.AppendItem(self.SaveDBMenuItem)
+        self.Bind(wx.EVT_MENU, self.OnDBSave, self.SaveDBMenuItem,
                   DB_SAVE_BIND_ID)
-        self.SetSaveDbMenuState()
+        self.SetSaveDBMenuState()
 
         fileMenu.AppendSeparator()
 
@@ -196,15 +203,15 @@ class MyFrame(wx.Frame):
 
         panel.SetSizer(vbox)
 
-    def SetSaveDbMenuState(self):
+    def SetSaveDBMenuState(self):
         '''
         Set the "Save DB" Menu item state, based on whether
         our DB is modified or not
         '''
         if rdb.DiscGolfCourseListModified:
-            self.SaveDbMenuItem.Enable(True)
+            self.SaveDBMenuItem.Enable(True)
         else:
-            self.SaveDbMenuItem.Enable(False)
+            self.SaveDBMenuItem.Enable(False)
 
     def SetCourseSelectedState(self, st):
         for i in self.itemButtons:
@@ -255,12 +262,46 @@ class MyFrame(wx.Frame):
         dprint("'DELETE COURSE' event (NYI) ...")
 
     def OnCourseShow(self, e):
-        dprint("'SHOW COURSE' event (NYI) ...")
+        dprint("'SHOW COURSE' event")
+        CourseShowFrame(self, title='Show Course')
+
+
+class CourseShowFrame(wx.Frame):
+    def __init__(self, *args, **kwargs):
+        super(CourseShowFrame, self).__init__(*args, **kwargs)
+        self.SetSize((700, 300))
+        self.InitUI()
+
+    def InitUI(self):
+        self.SetUpPanel()
+        self.Show(True)
+        dprint("'COURSE SHOW' Window Initialized")
+
+    def SetUpPanel(self):
+        panel = wx.Panel(self)
+
+        font = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
+        font.SetPointSize(10)
+
+        vbox = wx.BoxSizer(wx.VERTICAL)
+
+        vbox.AddSpacer(10)
+
+        hbox1 = wx.BoxSizer(wx.HORIZONTAL)
+        st1 = wx.StaticText(panel, label='Holes On Course')
+        st1.SetFont(font)
+        hbox1.Add(st1, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=10)
+        vbox.Add(hbox1, flag=wx.CENTER|wx.ALIGN_CENTER)
+
+        vbox.AddSpacer(10)
+
+        panel.SetSizer(vbox)
+
 
 def main():
     rdb.InitDB()
     app = wx.App()
-    MyFrame(None, title='Disc Golf DB')
+    DBMainFrame(None, title='Disc Golf DB')
     app.MainLoop()
 
 

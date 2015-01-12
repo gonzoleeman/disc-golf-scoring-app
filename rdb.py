@@ -66,6 +66,8 @@ class DiscGolfCourse:
 
 DiscGolfCourseList = []
 
+DiscGolfCourseListModified = False
+
 def AddDiscGolfCourse(*args, **kwargs):
     '''
     Add a Disc Golf Course

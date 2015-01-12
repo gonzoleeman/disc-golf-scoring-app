@@ -5,13 +5,19 @@ us to keep track of courses and holes on that course
 
 TO DO:
     - Figure out how to save state when quitting, i.e.
-      the "current" course, and perhaps other preferences
+      the "current" DB, course, hole, and perhaps other
+      preferences -- might need a ~/.dg file?
+    - Add "Are you sure" popup if DB is modified
+    - Add catching window close event
+    - DB: persist in a real file
 
 History:
     Version 1.0: menu bar present, hooked up, but on
         Quit works
     Version 1.1: Now using a better list, with columns, and
         faking out a ride database
+    Version 1.2: Now under git control. Added list selection
+        detection, list edit buttons, and button enable/disable
 '''
 
 import sys
@@ -28,9 +34,14 @@ __version__ = "1.2"
 
 
 QUIT_BIND_ID = 1
-SAVE_BIND_ID = 2
-OPEN_BIND_ID = 3
-NEW_BIND_ID = 4
+DB_SAVE_BIND_ID = 2
+DB_OPEN_BIND_ID = 3
+DB_NEW_BIND_ID = 4
+COURSE_ADD_BIND_ID = 5
+COURSE_EDIT_BIND_ID = 6
+COURSE_DELETE_BIND_ID = 7
+COURSE_SHOW_BIND_ID = 8
+
 
 class AutoWidthListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin):
     def __init__(self, parent):
@@ -49,37 +60,67 @@ class MyFrame(wx.Frame):
         Set up the menu bar
         '''
         menubar = wx.MenuBar()
+
+        ############################################
+
         fileMenu = wx.Menu()
-        nmi = wx.MenuItem(fileMenu, wx.ID_NEW, '&New')
-        fileMenu.AppendItem(nmi)
-        self.Bind(wx.EVT_MENU, self.OnNew, nmi, NEW_BIND_ID)
-        omi = wx.MenuItem(fileMenu, wx.ID_OPEN, '&Open')
-        fileMenu.AppendItem(omi)
-        self.Bind(wx.EVT_MENU, self.OnOpen, omi, OPEN_BIND_ID)
-        smi = wx.MenuItem(fileMenu, wx.ID_SAVE, '&Save')
-        fileMenu.AppendItem(smi)
-        self.Bind(wx.EVT_MENU, self.OnSave, smi, SAVE_BIND_ID)
+
+        ndbmi = wx.MenuItem(fileMenu, wx.ID_NEW, '&New DB')
+        fileMenu.AppendItem(ndbmi)
+        self.Bind(wx.EVT_MENU, self.OnDBNew, ndbmi, DB_NEW_BIND_ID)
+
+        odbmi = wx.MenuItem(fileMenu, wx.ID_OPEN, '&Open DB')
+        fileMenu.AppendItem(odbmi)
+        self.Bind(wx.EVT_MENU, self.OnDBOpen, odbmi, DB_OPEN_BIND_ID)
+
+        self.SaveDbMenuItem = wx.MenuItem(fileMenu, wx.ID_SAVE, '&Save DB')
+        fileMenu.AppendItem(self.SaveDbMenuItem)
+        self.Bind(wx.EVT_MENU, self.OnDBSave, self.SaveDbMenuItem,
+                  DB_SAVE_BIND_ID)
+        self.SetSaveDbMenuState()
+
         fileMenu.AppendSeparator()
+
         qmi = wx.MenuItem(fileMenu, wx.ID_EXIT, '&Quit')
         fileMenu.AppendItem(qmi)
         self.Bind(wx.EVT_MENU, self.OnQuit, qmi, QUIT_BIND_ID)
-        accel_tbl = wx.AcceleratorTable([\
-                (wx.ACCEL_CTRL, ord('Q'), QUIT_BIND_ID),
-                (wx.ACCEL_CTRL, ord('N'), NEW_BIND_ID),
-                (wx.ACCEL_CTRL, ord('O'), OPEN_BIND_ID),
-                (wx.ACCEL_CTRL, ord('S'), SAVE_BIND_ID),
-                ])
-        self.SetAcceleratorTable(accel_tbl)
-        menubar.Append(fileMenu, '&File')
+
+        menubar.Append(fileMenu, 'DB &File')
+        
+        ############################################
         
         editMenu = wx.Menu()
+
+        self.itemMenuItems = []
+
+        acmi = wx.MenuItem(editMenu, wx.ID_ADD, 'Add Course')
+        editMenu.AppendItem(acmi)
+        self.Bind(wx.EVT_MENU, self.OnCourseAdd, acmi, COURSE_ADD_BIND_ID)
+        self.itemMenuItems.append(acmi)
+
+        ecmi = wx.MenuItem(editMenu, wx.ID_EDIT, 'Edit Course')
+        editMenu.AppendItem(ecmi)
+        self.itemMenuItems.append(ecmi)
+
+        dcmi = wx.MenuItem(editMenu, wx.ID_DELETE, 'Delete Course')
+        editMenu.AppendItem(dcmi)
+        self.itemMenuItems.append(dcmi)
+
         menubar.Append(editMenu, '&Edit')
-        nmi = wx.MenuItem(editMenu, wx.ID_UNDO, '&Undo')
-        editMenu.AppendItem(nmi)
+
+        ############################################
 
         helpMenu = wx.Menu()
         menubar.Append(helpMenu, '&Help')
         
+        accel_tbl = wx.AcceleratorTable([\
+                (wx.ACCEL_CTRL, ord('Q'), QUIT_BIND_ID),
+                (wx.ACCEL_CTRL, ord('N'), DB_NEW_BIND_ID),
+                (wx.ACCEL_CTRL, ord('O'), DB_OPEN_BIND_ID),
+                (wx.ACCEL_CTRL, ord('S'), DB_SAVE_BIND_ID),
+                ])
+        self.SetAcceleratorTable(accel_tbl)
+
         self.SetMenuBar(menubar)
 
     def SetUpPanel(self):
@@ -134,91 +175,87 @@ class MyFrame(wx.Frame):
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
         abutton = wx.Button(panel, label='Add', size=(70, 30))
         hbox3.Add(abutton)
+        self.Bind(wx.EVT_BUTTON, self.OnCourseAdd, abutton, COURSE_ADD_BIND_ID)
         ebutton = wx.Button(panel, label='Edit', size=(70, 30))
         hbox3.Add(ebutton)
+        self.Bind(wx.EVT_BUTTON, self.OnCourseEdit, ebutton,
+                  COURSE_EDIT_BIND_ID)
         dbutton = wx.Button(panel, label='Delete', size=(70, 30))
         hbox3.Add(dbutton)
-        sbutton = wx.Button(panel, label='Show', size=(70, 30))
-        self.itemButtons = [ebutton, dbutton, sbutton]
-        self.SetItemButtonsState(False)
-        hbox3.Add(sbutton)
+        self.Bind(wx.EVT_BUTTON, self.OnCourseDelete, dbutton,
+                  COURSE_DELETE_BIND_ID)
+        self.ShowButton = wx.Button(panel, label='Show', size=(70, 30))
+        hbox3.Add(self.ShowButton)
+        self.Bind(wx.EVT_BUTTON, self.OnCourseShow, self.ShowButton,
+                  COURSE_SHOW_BIND_ID)
+
+        self.itemButtons = [ebutton, dbutton, self.ShowButton]
+        self.SetCourseSelectedState(False)
+
         vbox.Add(hbox3, flag=wx.CENTER|wx.ALIGN_CENTER, border=10)
 
         panel.SetSizer(vbox)
 
-    def SetItemButtonsState(self, st):
+    def SetSaveDbMenuState(self):
+        '''
+        Set the "Save DB" Menu item state, based on whether
+        our DB is modified or not
+        '''
+        if rdb.DiscGolfCourseListModified:
+            self.SaveDbMenuItem.Enable(True)
+        else:
+            self.SaveDbMenuItem.Enable(False)
+
+    def SetCourseSelectedState(self, st):
         for i in self.itemButtons:
             if st:
                 i.Enable()
             else:
                 i.Disable()
+        for i in self.itemMenuItems:
+            i.Enable(st)
 
     def ListSelected(self, e):
-        '''
-        A list item is highlighed/selected
-        '''
         dprint("List Item Selected, Index=%d" % e.Index)
-        self.SetItemButtonsState(True)
+        self.SetCourseSelectedState(True)
 
     def ListDeselected(self, e):
-        '''
-        A List item that was selected is deselected
-        '''
         dprint("List Item Deselected, Index=%d" % e.Index)
-        self.SetItemButtonsState(False)
+        self.SetCourseSelectedState(False)
 
     def ListActivated(self, e):
-        '''
-        Double Click on a list item
-        '''
         dprint("List Activated, Index=%d" % e.Index)
 
     def InitUI(self):
-        '''
-        Initialize the GUI
-        '''
         self.SetUpMenuBar()
         self.SetUpPanel()
         self.Show(True)
         dprint("GUI Initialized")
 
     def OnQuit(self, e):
-        '''
-        Handle a "quit" menu choice
-        '''
         dprint("'QUIT' event")
         self.Close()
 
-    def OnNew(self, e):
-        '''
-        Handle a "new" menu choice -- this should
-        throw away current changes (after asking), then
-        start with an empty slate
-        '''
-        # popup a "new file" dialog
-        # create the database file
-        dprint("'NEW' event (NYI) ...")
+    def OnDBNew(self, e):
+        dprint("'NEW DB' event (NYI) ...")
 
-    def OnOpen(self, e):
-        '''
-        Handle a "open" menu choice -- this should
-        throw away current changes (after asking), then
-        read the database from a file
-        '''
-        # popup a "open file" dialog
-        # populate the database
-        dprint("'OPEN' event (NYI) ...")
+    def OnDBOpen(self, e):
+        dprint("'OPEN DB' event (NYI) ...")
 
-    def OnSave(self, e):
-        '''
-        Handle a "save" menu choice -- this should
-        save the current database as a file, then
-        mark the database as unmodified
-        '''
-        # popup a "save file" dialog
-        # create the database file
-        dprint("'SAVE' event (NYI) ...")
+    def OnDBSave(self, e):
+        dprint("'SAVE DB' event (NYI) ...")
 
+    def OnCourseAdd(self, e):
+        dprint("'ADD COURSE' event (NYI) ...")
+
+    def OnCourseEdit(self, e):
+        dprint("'EDIT COURSE' event (NYI) ...")
+
+    def OnCourseDelete(self, e):
+        dprint("'DELETE COURSE' event (NYI) ...")
+
+    def OnCourseShow(self, e):
+        dprint("'SHOW COURSE' event (NYI) ...")
 
 def main():
     rdb.InitDB()

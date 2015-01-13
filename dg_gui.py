@@ -279,11 +279,11 @@ class CourseShowFrame(wx.Frame):
         super(CourseShowFrame, self).__init__(*args, **kwargs)
 
     def InitUI(self, db_item_idx):
-        self.db_entry = rdb.DiscGolfCourseList[db_item_idx]
+        self.dbEntry = rdb.DiscGolfCourseList[db_item_idx]
         self.SetSize((700, 300))
         self.SetUpPanel()
         self.Show(True)
-        dprint("'COURSE SHOW' Window Initialized:", self.db_entry)
+        dprint("'COURSE SHOW' Window Initialized:", self.dbEntry)
 
     def SetUpPanel(self):
         panel = wx.Panel(self)
@@ -296,13 +296,28 @@ class CourseShowFrame(wx.Frame):
         vbox.AddSpacer(10)
 
         hbox1 = wx.BoxSizer(wx.HORIZONTAL)
-        st1 = wx.StaticText(panel,
-                            label='Holes On Course: %s' % self.db_entry.cname)
+        st1 = wx.StaticText(panel, label='Course Name:', size=(100, 20))
         st1.SetFont(font)
-        hbox1.Add(st1, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=10)
-        vbox.Add(hbox1, flag=wx.CENTER|wx.ALIGN_CENTER)
+        hbox1.Add(st1, flag=wx.TOP|wx.LEFT, border=10)
 
-        vbox.AddSpacer(10)
+        tc1 = wx.TextCtrl(panel, size=(350, 20))
+        tc1.write(self.dbEntry.cname)
+        hbox1.Add(tc1, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=10)
+
+        vbox.Add(hbox1, flag=wx.LEFT)
+
+        hbox2 = wx.BoxSizer(wx.HORIZONTAL)
+        st2 = wx.StaticText(panel, label='Location:', size=(100, 20))
+        st2.SetFont(font)
+        hbox2.Add(st2, flag=wx.TOP|wx.LEFT, border=10)
+
+        tc2 = wx.TextCtrl(panel, size=(350, 20))
+        tc2.write(self.dbEntry.loc)
+        hbox2.Add(tc2, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=10)
+
+        vbox.Add(hbox2, flag=wx.LEFT)
+
+        # vbox.AddSpacer(10)
 
         panel.SetSizer(vbox)
 

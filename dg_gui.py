@@ -52,7 +52,8 @@ COURSE_SHOW_BIND_ID = 8
 
 class AutoWidthListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin):
     def __init__(self, parent):
-        wx.ListCtrl.__init__(self, parent, -1, style=wx.LC_REPORT)
+        wx.ListCtrl.__init__(self, parent, -1,
+                             style=wx.LC_REPORT|wx.LC_SINGLE_SEL)
         ListCtrlAutoWidthMixin.__init__(self)
 
 
@@ -112,6 +113,12 @@ class DBMainFrame(wx.Frame):
         dcmi = wx.MenuItem(editMenu, wx.ID_DELETE, 'Delete Course')
         editMenu.AppendItem(dcmi)
         self.itemMenuItems.append(dcmi)
+
+        scmi = wx.MenuItem(editMenu, wx.ID_ANY, 'Show Course')
+        editMenu.AppendItem(scmi)
+        self.itemMenuItems.append(scmi)
+        self.Bind(wx.EVT_MENU, self.OnCourseShow, scmi,
+                  COURSE_SHOW_BIND_ID)
 
         menubar.Append(editMenu, '&Edit')
 
@@ -173,8 +180,7 @@ class DBMainFrame(wx.Frame):
         self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.ListDeselected,
                   source=self.list,
                   id=wx.ID_ANY)
-
-        self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.ListActivated,
+        self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.OnCourseShow,
                   source=self.list,
                   id=wx.ID_ANY)
 
@@ -263,19 +269,21 @@ class DBMainFrame(wx.Frame):
 
     def OnCourseShow(self, e):
         dprint("'SHOW COURSE' event")
-        CourseShowFrame(self, title='Show Course')
+        db_item_idx = self.list.GetFocusedItem()
+        csf = CourseShowFrame(self, title='Show Course')
+        csf.InitUI(db_item_idx)
 
 
 class CourseShowFrame(wx.Frame):
     def __init__(self, *args, **kwargs):
         super(CourseShowFrame, self).__init__(*args, **kwargs)
-        self.SetSize((700, 300))
-        self.InitUI()
 
-    def InitUI(self):
+    def InitUI(self, db_item_idx):
+        self.db_entry = rdb.DiscGolfCourseList[db_item_idx]
+        self.SetSize((700, 300))
         self.SetUpPanel()
         self.Show(True)
-        dprint("'COURSE SHOW' Window Initialized")
+        dprint("'COURSE SHOW' Window Initialized:", self.db_entry)
 
     def SetUpPanel(self):
         panel = wx.Panel(self)
@@ -288,7 +296,8 @@ class CourseShowFrame(wx.Frame):
         vbox.AddSpacer(10)
 
         hbox1 = wx.BoxSizer(wx.HORIZONTAL)
-        st1 = wx.StaticText(panel, label='Holes On Course')
+        st1 = wx.StaticText(panel,
+                            label='Holes On Course: %s' % self.db_entry.cname)
         st1.SetFont(font)
         hbox1.Add(st1, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=10)
         vbox.Add(hbox1, flag=wx.CENTER|wx.ALIGN_CENTER)

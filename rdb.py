@@ -48,6 +48,14 @@ class DiscGolfCourse:
         self.holes = {}
         self.course_no = -1
 
+    def __str__(self):
+        fstr = "Course: %s" % self.cname
+        if self.loc:
+            fstr += ", Loc: %s" % self.loc
+        if self.desc:
+            fstr += ", Desc: %s" % self.desc
+        return fstr
+
     def AddHole(self,  hnum, hpar, hlen=None, hdesc=None):
         '''
         Convenience method to add a new hole

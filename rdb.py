@@ -21,18 +21,18 @@ class DiscGolfHole:
     '''
     Represents one hole on one Disc Golf Course
     '''
-    def __init__(self, hnum, hpar, hlen=None, hdesc=None):
-        self.hnum = hnum
-        self.hpar = hpar
+    def __init__(self, num, par, hlen=None, desc=None):
+        self.num = num
+        self.par = par
         self.hlen = hlen
-        self.hdesc = hdesc
+        self.desc = desc
 
     def __str__(self):
-        fstr = "Hole %d: par=%d" % (self.hnum, self.hpar)
+        fstr = "Hole %d: par=%d" % (self.num, self.par)
         if self.hlen:
             fstr += ", len=%d" % self.hlen
-        if self.hdesc:
-            fstr += ", desc=\"%s\"" % self.hdesc
+        if self.desc:
+            fstr += ", desc=\"%s\"" % self.desc
         return fstr
 
 
@@ -57,16 +57,16 @@ class DiscGolfCourse:
         fstr += ", num=%d" % self.courseNo
         return fstr
 
-    def AddHole(self,  hnum, hpar, hlen=None, hdesc=None):
+    def AddHole(self, num, par, hlen=None, desc=None):
         '''
         Convenience method to add a new hole
         '''
-        self.holes[hnum] = DiscGolfHole(hnum, hpar, hlen, hdesc)
+        self.holes[num] = DiscGolfHole(num, par, hlen, desc)
 
     def GetCoursePar(self):
         ttl_par = 0
         for ch in self.holes:
-            ttl_par += self.holes[ch].hpar
+            ttl_par += self.holes[ch].par
         return ttl_par
 
     def NumHoles(self):
@@ -104,15 +104,15 @@ def InitDB():
     c = AddDiscGolfCourse("Pat's House", loc="Near Corvallis",
                           desc="Lot's of Cow Poo")
     c.AddHole(1, 3,
-              hdesc="From water trough to bucket on barn wall, over garage")
-    c.AddHole(2, 2, hdesc="From big tree to corner of yard, under branches")
-    c.AddHole(3, 3, hdesc="Short corner-to-corner along road fence, easy 3")
-    c.AddHole(4, 3, hdesc="Long, over the garden throw, Garden OB")
+              desc="From water trough to bucket on barn wall, over garage")
+    c.AddHole(2, 2, desc="From big tree to corner of yard, under branches")
+    c.AddHole(3, 3, desc="Short corner-to-corner along road fence, easy 3")
+    c.AddHole(4, 3, desc="Long, over the garden throw, Garden OB")
 
     c = AddDiscGolfCourse("Dick's House", loc="Near Corvallis",
                           desc="Can be wet, is mostly flat")
-    c.AddHole(1, 3, hdesc="Over hedge, from garage to front corner")
-    c.AddHole(2, 2, hdesc="From corner to near driveway")
-    c.AddHole(3, 3, hdesc="From driveway to far front corner")
-    c.AddHole(4, 3, hdesc="From far front corner to front of driveway")
-    c.AddHole(5, 3, hdesc="Can't remember this hole!")
+    c.AddHole(1, 3, desc="Over hedge, from garage to front corner")
+    c.AddHole(2, 2, desc="From corner to near driveway")
+    c.AddHole(3, 3, desc="From driveway to far front corner")
+    c.AddHole(4, 3, desc="From far front corner to front of driveway")
+    c.AddHole(5, 3, desc="Can't remember this hole!")

@@ -308,12 +308,12 @@ class CourseShowFrame(wx.Frame):
 
         vbox = wx.BoxSizer(wx.VERTICAL)
 
-        font = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
-        font.SetPointSize(12)
+        font1 = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
+        font1.SetPointSize(12)
 
         hbox0 = wx.BoxSizer(wx.HORIZONTAL)
         st1 = wx.StaticText(panel, label='Disc Golf Course Detail')
-        st1.SetFont(font)
+        st1.SetFont(font1)
         hbox0.Add(st1, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=10)
         vbox.Add(hbox0, flag=wx.CENTER|wx.ALIGN_CENTER)
 
@@ -346,6 +346,29 @@ class CourseShowFrame(wx.Frame):
         hbox3.Add(tc3, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=10)
 
         vbox.Add(hbox3, flag=wx.LEFT)
+
+        hbox4 = wx.BoxSizer(wx.HORIZONTAL)
+        #st4 = StaticLabelPanel(panel, label='Holes')
+        #hbox4.Add(st4, flag=wx.TOP|wx.LEFT, border=10)
+
+        self.list = AutoWidthListCtrl(panel)
+        self.list.InsertColumn(0, 'Number', width=80)
+        self.list.InsertColumn(1, 'Par', width=50)
+        self.list.InsertColumn(2, 'Length (yds)', width=100)
+        self.list.InsertColumn(3, 'Description', width=200)
+
+        dprint("DB Entry: %s" % self.dbEntry.holes)
+        for idx, ent in self.dbEntry.holes.iteritems():
+            dprint('Found hole[%d]: %s' % (idx, ent))
+            index = self.list.InsertStringItem(sys.maxint, "%d" % ent.num)
+            self.list.SetStringItem(index, 1, "%d" % ent.par)
+            if ent.hlen:
+                self.list.SetStringItem(index, 2, "%d" % ent.hlen)
+            if ent.desc:
+                self.list.SetStringItem(index, 3, ent.desc)
+
+        hbox4.Add(self.list, 1, wx.EXPAND|wx.ALL, border=10)
+        vbox.Add(hbox4, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
 
         panel.SetSizer(vbox)
 

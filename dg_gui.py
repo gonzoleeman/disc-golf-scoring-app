@@ -144,7 +144,7 @@ class DBMainFrame(wx.Frame):
         panel = wx.Panel(self)
 
         font = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
-        font.SetPointSize(10)
+        font.SetPointSize(14)
 
         vbox = wx.BoxSizer(wx.VERTICAL)
 
@@ -274,6 +274,24 @@ class DBMainFrame(wx.Frame):
         csf.InitUI(db_item_idx)
 
 
+class StaticLabelPanel(wx.StaticText):
+    def __init__(self, *args, **kwargs):
+        super(StaticLabelPanel, self).__init__(*args, **kwargs)
+        font = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
+        font.SetPointSize(10)
+        self.SetFont(font)
+        self.SetInitialSize((100, 20))
+
+
+class ReadonlyTextCtrl(wx.TextCtrl):
+    def __init__(self, *args, **kwargs):
+        super(ReadonlyTextCtrl, self).__init__(*args, **kwargs)
+        font = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
+        font.SetPointSize(10)
+        self.SetFont(font)
+        self.SetWindowStyle(wx.TE_READONLY)
+
+
 class CourseShowFrame(wx.Frame):
     def __init__(self, *args, **kwargs):
         super(CourseShowFrame, self).__init__(*args, **kwargs)
@@ -288,36 +306,46 @@ class CourseShowFrame(wx.Frame):
     def SetUpPanel(self):
         panel = wx.Panel(self)
 
-        font = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
-        font.SetPointSize(10)
-
         vbox = wx.BoxSizer(wx.VERTICAL)
 
+        font = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
+        font.SetPointSize(12)
+
+        hbox0 = wx.BoxSizer(wx.HORIZONTAL)
+        st1 = wx.StaticText(panel, label='Disc Golf Course Detail')
+        st1.SetFont(font)
+        hbox0.Add(st1, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=10)
+        vbox.Add(hbox0, flag=wx.CENTER|wx.ALIGN_CENTER)
+
+        vbox.AddSpacer(10)
         vbox.AddSpacer(10)
 
         hbox1 = wx.BoxSizer(wx.HORIZONTAL)
-        st1 = wx.StaticText(panel, label='Course Name:', size=(100, 20))
-        st1.SetFont(font)
+        st1 = StaticLabelPanel(panel, label='Name:')
         hbox1.Add(st1, flag=wx.TOP|wx.LEFT, border=10)
 
-        tc1 = wx.TextCtrl(panel, size=(350, 20))
-        tc1.write(self.dbEntry.cname)
+        tc1 = ReadonlyTextCtrl(panel, size=(350, 20), value=self.dbEntry.cname)
         hbox1.Add(tc1, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=10)
 
         vbox.Add(hbox1, flag=wx.LEFT)
 
         hbox2 = wx.BoxSizer(wx.HORIZONTAL)
-        st2 = wx.StaticText(panel, label='Location:', size=(100, 20))
-        st2.SetFont(font)
+        st2 = StaticLabelPanel(panel, label='Location:')
         hbox2.Add(st2, flag=wx.TOP|wx.LEFT, border=10)
 
-        tc2 = wx.TextCtrl(panel, size=(350, 20))
-        tc2.write(self.dbEntry.loc)
+        tc2 = ReadonlyTextCtrl(panel, size=(350, 20), value=self.dbEntry.loc)
         hbox2.Add(tc2, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=10)
 
         vbox.Add(hbox2, flag=wx.LEFT)
 
-        # vbox.AddSpacer(10)
+        hbox3 = wx.BoxSizer(wx.HORIZONTAL)
+        st3 = StaticLabelPanel(panel, label='Description:')
+        hbox3.Add(st3,  flag=wx.TOP|wx.LEFT, border=10)
+
+        tc3 = ReadonlyTextCtrl(panel, size=(350, 20), value=self.dbEntry.desc)
+        hbox3.Add(tc3, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=10)
+
+        vbox.Add(hbox3, flag=wx.LEFT)
 
         panel.SetSizer(vbox)
 

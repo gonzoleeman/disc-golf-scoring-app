@@ -46,7 +46,7 @@ class DiscGolfCourse:
         self.loc = loc
         self.desc = desc
         self.holes = {}
-        self.course_no = -1
+        self.courseNo = -1
 
     def __str__(self):
         fstr = "Course: %s" % self.cname
@@ -54,6 +54,7 @@ class DiscGolfCourse:
             fstr += ", Loc: %s" % self.loc
         if self.desc:
             fstr += ", Desc: %s" % self.desc
+        fstr += ", num=%d" % self.courseNo
         return fstr
 
     def AddHole(self,  hnum, hpar, hlen=None, hdesc=None):
@@ -76,11 +77,16 @@ DiscGolfCourseList = []
 
 DiscGolfCourseListModified = False
 
+__CurrentMaxCourseNumber__ = 0
+
 def AddDiscGolfCourse(*args, **kwargs):
     '''
     Add a Disc Golf Course
     '''
+    global __CurrentMaxCourseNumber__
     course = DiscGolfCourse(*args, **kwargs)
+    course.courseNo = __CurrentMaxCourseNumber__ + 1
+    __CurrentMaxCourseNumber__ = course.courseNo
     DiscGolfCourseList.append(course)
     dprint("Creating DB Course ...")
     return course

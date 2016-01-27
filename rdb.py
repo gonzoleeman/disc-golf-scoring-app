@@ -2,8 +2,21 @@
 '''
 Python ride database class
 
-TO DO:
-    - throw exception of we write over a hole on a course
+ these classes represent the
+ the disc golf course database
+
+ There are three classes:
+ * Course,
+ * Player, and
+ * Round
+
+ Which will populate 3 dictionary tables:
+ * CourseList,
+ * PlayerList, and
+ * RoundList
+
+Designed to use a plugable backend (using classes), but using
+a file backend to start
 '''
 
 __version__ = "1.0"
@@ -12,107 +25,99 @@ __author__ = "Lee Duncan"
 
 from utils import dprint
 from opts import opts
+import sqlite3
 
-
-__DB_MODIFIED__ = False
-
-
-class DiscGolfHole:
+class Course:
     '''
-    Represents one hole on one Disc Golf Course
+    A single Disc Golf Course
     '''
-    def __init__(self, num, par, hlen=None, desc=None):
-        self.num = num
-        self.par = par
-        self.hlen = hlen
-        self.desc = desc
+    def __init__(self, cnum, cname):
+        self.num = cnum
+        self.name = cname
 
     def __str__(self):
-        fstr = "Hole %d: par=%d" % (self.num, self.par)
-        if self.hlen:
-            fstr += ", len=%d" % self.hlen
-        if self.desc:
-            fstr += ", desc=\"%s\"" % self.desc
-        return fstr
+        return "Course[%d]: %s" % (self.num, self.name)
 
-
-class DiscGolfCourse:
+class Player:
     '''
-    Each one of these represents a Disc Golf Course IRW
-    (In the Real World)
+    A Disc Golf Player
     '''
-    def __init__(self, cname, loc=None, desc=None):
-        self.cname = cname
-        self.loc = loc
-        self.desc = desc
-        self.holes = {}
-        self.courseNo = -1
+    def __init__(self, pnum, sname, lname):
+        self.num = pnum
+        self.name = sname
+        self.long_name = lname
 
     def __str__(self):
-        fstr = "Course: %s" % self.cname
-        if self.loc:
-            fstr += ", Loc: %s" % self.loc
-        if self.desc:
-            fstr += ", Desc: %s" % self.desc
-        fstr += ", num=%d" % self.courseNo
-        return fstr
-
-    def AddHole(self, num, par, hlen=None, desc=None):
-        '''
-        Convenience method to add a new hole
-        '''
-        self.holes[num] = DiscGolfHole(num, par, hlen, desc)
-
-    def GetCoursePar(self):
-        ttl_par = 0
-        for ch in self.holes:
-            ttl_par += self.holes[ch].par
-        return ttl_par
-
-    def NumHoles(self):
-        return len(self.holes)
+        return "Player[%d]: %s (%s)" % \
+               (self.num, self.long_name, self.name)
 
 
-DiscGolfCourseList = []
-
-DiscGolfCourseListModified = False
-
-__CurrentMaxCourseNumber__ = 0
-
-def AddDiscGolfCourse(*args, **kwargs):
+class Round:
     '''
-    Add a Disc Golf Course
+    One round, not counting the individual scores
     '''
-    global __CurrentMaxCourseNumber__
-    course = DiscGolfCourse(*args, **kwargs)
-    course.courseNo = __CurrentMaxCourseNumber__ + 1
-    __CurrentMaxCourseNumber__ = course.courseNo
-    DiscGolfCourseList.append(course)
-    dprint("Creating DB Course ...")
-    return course
+    def __init__(self, rnum, cnum, rdate):
+        self.num = rnum
+        self.course_num = cnum
+        self.rdate = rdate
+
+    def __str__(self):
+        return "Round[%d]: course=%d, %s" % \
+               (self.num, self.course_num, self.rdate)
+
+class RoundDetail:
+    '''
+    One entry for one person for one round (which is one course on one day)
+    '''
+    def __init__(self, rnum, pnum, fscore, bscore, acnt=0, ecnt=0):
+        self.round_num = rnum
+        self.player_num = pnum
+        self.front_score = fscore
+        self.back_score = bscore
+        self.ace_cnt = acnt
+        self.eagle_cnt = ecnt
+
+    def __str__(self):
+        return "Round[%d]: player=%d, score=%d/%d, a/e=%d/%d" % \
+               (self.round_num, self.player_num,
+                self.front_score, self.back_score,
+                self.ace_cnt, self.eagle_cnt)
+
+DB_DIR = 'db'
+DB_FILE = 'disc_golf.db'
+DB_PATH = "%s/%s" % (DB_DIR, DB_FILE)
+
+CourseList = {}
+PlayerList = {}
+RoundList = {}
+RoundDetailList = {}
+
+#
+# database routines (use a 'class'?)
+#
+def initDB():
+    global CourseList
+    global PlayerList
+    global RoundList
+    global RoundDetailList
     
-
-def InitDB():
-    '''
-    Initialized the Database
-    '''
-
-    #
-    # fake out some data for our courses
-    #
-
-    c = AddDiscGolfCourse("Pat's House", loc="Near Corvallis",
-                          desc="Lot's of Cow Poo")
-    c.AddHole(1, 3,
-              desc="From water trough to bucket on barn wall, over garage")
-    c.AddHole(2, 2, desc="From big tree to corner of yard, under branches")
-    c.AddHole(3, 3, desc="Short corner-to-corner along road fence, easy 3")
-    c.AddHole(4, 3, desc="Long, over the garden throw, Garden OB")
-
-    c = AddDiscGolfCourse("Dick's House", loc="Near Corvallis",
-                          desc="Can be wet, is mostly flat")
-    c.AddHole(1, 3, desc="Over hedge, from garage to front corner")
-    c.AddHole(2, 2, desc="From corner to near driveway")
-    c.AddHole(3, 3, desc="From driveway to far front corner")
-    c.AddHole(4, 3, desc="From far front corner to front of driveway")
-    c.AddHole(5, 3, desc="Can't remember this hole!")
+    '''Initialize the DG Database'''
+    dprint("Initializing the Database (%s) ..." % DB_PATH)
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    # now read our DB tables into Python objects
+    dprint("Initializing Disc Golf Courses ...")
+    for row in c.execute('''SELECT * FROM courses'''):
+        course_num = row[0]
+        dprint("Adding course[%d]: %s" % (course_num, row[1]))
+        CourseList[course_num] = Course(course_num, row[1])
+    for row in c.execute('''SELECT * FROM players'''):
+        player_num = row[0]
+        dprint("Adding player[%d]: %s (%s)" % (player_num, row[1], row[2]))
+        PlayerList[player_num] = Player(player_num, row[1], row[2])
+    for row in c.execute('''SELECT * FROM rounds'''):
+        round_num =row[0]
+        course_num = row[1]
+        dprint("Adding round[%d]: Course=%s, %s" % \
+               (round_num, course_num, row[2]))
+        RoundList[round_num] = Round(player_num, course_num, row[2])

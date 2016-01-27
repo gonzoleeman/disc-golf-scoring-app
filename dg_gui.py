@@ -9,6 +9,7 @@ TO DO:
       - Help -- empty for now
     - Check for options (e.g. "--debug|-d") at startup
     - support DB modification for Courses
+    - implement real help?
 
     - Figure out how to save state when quitting, i.e.
       the "current" DB, course, hole, and perhaps other
@@ -18,6 +19,14 @@ TO DO:
     - Add pictures to DB some day? (e.g. for start screen?)
     - Properly package for distribution
 
+    - implement windows for:
+      * scoring a round
+      * looking at a round (same?)
+      * looking at results (with graph(s)?)
+
+    - make setup window go away when scoring a round (use
+      same window, with tabs or something?)
+
 History:
     Version 1.0: menu bar present, hooked up, but on
         Quit works
@@ -25,6 +34,8 @@ History:
         faking out a ride database
     Version 1.2: Now under git control. Added list selection
         detection, list edit buttons, and button enable/disable
+    version 1.3: trynig to get it arranged correctly
+    version 1.4: getting closer: setting up a round correctly now
 '''
 
 import sys
@@ -37,7 +48,7 @@ from opts import opts
 
 
 __author__ = "Lee Duncan"
-__version__ = "1.3"
+__version__ = "1.4"
 
 
 
@@ -55,98 +66,16 @@ class AutoWidthCheckListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin,
         CheckListCtrlMixin.__init__(self)
         ListCtrlAutoWidthMixin.__init__(self)
         self.Bind(wx.EVT_LIST_COL_CLICK, self.OnCheckItem)
-        self.itemsChecked = {}
+        self.items_checked = {}
+        self.item_check_count = 0
 
     def OnCheckItem(self, data, flag):
-        dprint("data:", data)
-        dprint("flag", flag)
-        self.itemsChecked[data] = flag
-
-class ChooseCourseFrame(wx.Frame):
-    def __init__(self, *args, **kwargs):
-        super(ChooseCourseFrame, self).__init__(*args, **kwargs)
-        self.SetSize((400, 200))
-        self.InitUI()
-        self.course_select = False
-
-    def SetUpPanel(self):
-        '''
-        Set up the main (panel) window of the GUI
-        '''
-        panel = wx.Panel(self)
-
-        font = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
-        font.SetPointSize(14)
-
-        vbox = wx.BoxSizer(wx.VERTICAL)
-
-        vbox.AddSpacer(10)
-
-        hbox1 = wx.BoxSizer(wx.HORIZONTAL)
-        st1 = wx.StaticText(panel, label='Disc Golf Courses')
-        st1.SetFont(font)
-        hbox1.Add(st1, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=10)
-        vbox.Add(hbox1, flag=wx.CENTER|wx.ALIGN_CENTER)
-
-        vbox.AddSpacer(10)
-
-        hbox2 = wx.BoxSizer(wx.HORIZONTAL)
-        self.list = AutoWidthListCtrl(panel)
-        self.list.InsertColumn(0, 'Choose a Course', width=100)
-        for k in rdb.CourseList.iterkeys():
-            c = rdb.CourseList[k]
-            dprint("Setting up:", c)
-            index = self.list.InsertStringItem(sys.maxint, c.name)
-            dprint("Inserted in list, index=%d" % index)
-            self.list.SetItemData(index, k)
-        hbox2.Add(self.list, 1, wx.EXPAND|wx.ALL, border=10)
-        vbox.Add(hbox2, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
-
-        self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.ListSelected,
-                  source=self.list,
-                  id=wx.ID_ANY)
-        self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.ListActivated,
-                  source=self.list,
-                  id=wx.ID_ANY)
-
-        # lastly, add a button at the bottom for setting up the round
-        hbox3 = wx.BoxSizer(wx.HORIZONTAL)
-        self.play_button = wx.Button(panel, label='Setup a Round',
-                                     size=(150, 30))
-        self.Bind(wx.EVT_BUTTON, self.ButtonPressed,
-                  source=self.play_button, id=wx.ID_ANY)
-        self.play_button.Disable()
-        hbox3.Add(self.play_button)
-        vbox.Add(hbox3, flag=wx.CENTER|wx.ALIGN_CENTER, border=10)
-
-        panel.SetSizer(vbox)
-
-    def ListSelected(self, e):
-        dprint("List Item [%d] Selected" % e.Index)
-        self.play_button.Enable()
-
-    def ListActivated(self, e):
-        dprint("List Item [%d] Activated" % e.Index)
-        self.SetupRound(e.Index)
-
-    def ButtonPressed(self, e):
-        dprint("Button Pressed")
-        self.SetupRound(self.list.GetFirstSelected())
-
-    def SetupRound(self, i):
-        '''play a round on course[i]'''
-        dprint("Play a round on course, list index=%d, index=%d" % \
-               (i, self.list.GetItemData(i)))
-        c = rdb.CourseList[self.list.GetItemData(i)]
-        dprint("Playing at:", c)
-        r = SetupRoundFrame(self,
-                            title='Setup a Round at %s' % c.name)
-        r.Show(True)
-
-    def InitUI(self):
-        self.SetUpPanel()
-        self.Show(True)
-        dprint("Window Initialized")
+        dprint("Setting items_checked[%d] = %s" % (data, flag))
+        self.items_checked[data] = flag
+        if flag:
+            self.item_check_count = self.item_check_count + 1
+        else:
+            self.item_check_count = self.item_check_count - 1
 
 
 class SetupRoundFrame(wx.Frame):
@@ -159,7 +88,7 @@ class SetupRoundFrame(wx.Frame):
         '''
         Set up the main (panel) window of the GUI
         '''
-        panel = wx.Panel(self)
+        panel = wx.Panel(self, style=wx.SIMPLE_BORDER)
 
         font = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
         font.SetPointSize(14)
@@ -176,50 +105,104 @@ class SetupRoundFrame(wx.Frame):
 
         vbox.AddSpacer(10)
 
-        hbox15 = wx.BoxSizer(wx.HORIZONTAL)
-        st = wx.StaticText(panel, label='Course:')
-        hbox15.Add(st)
-        #sc = wx.SpinCtrl(panel, )
-
         hbox2 = wx.BoxSizer(wx.HORIZONTAL)
-        self.list = AutoWidthCheckListCtrl(panel)
-        self.list.InsertColumn(0, 'Choose Players', width=150)
+
+        self.player_list = AutoWidthCheckListCtrl(panel)
+        self.player_list.InsertColumn(0, 'Choose Players', width=100)
         for k in rdb.PlayerList.iterkeys():
             p = rdb.PlayerList[k]
             dprint("Setting up:", p)
-            self.list.InsertStringItem(sys.maxint, p.name)
-        self.list.OnCheckItem(0, True)
-        hbox2.Add(self.list, 1, wx.EXPAND|wx.ALL, border=10)
-        vbox.Add(hbox2, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
+            index = self.player_list.InsertStringItem(sys.maxint, p.name)
+            dprint("Inserted %s in list, index=%d" % (p, index))
+            self.player_list.SetItemData(index, k)
+        hbox2.Add(self.player_list, 1, wx.EXPAND|wx.LEFT, border=10)
 
-        self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.ListSelected,
-                  source=self.list,
+        self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.PlayerListSelected,
+                  source=self.player_list,
                   id=wx.ID_ANY)
 
-        # lastly, add a button at the bottom for playing a round
+        hbox2.AddSpacer(15)
+
+        self.course_list = AutoWidthListCtrl(panel)
+        self.course_list.InsertColumn(0, 'Choose a Course', width=100)
+        for k in rdb.CourseList.iterkeys():
+            c = rdb.CourseList[k]
+            index = self.course_list.InsertStringItem(sys.maxint, c.name)
+            dprint("Inserted %s in list, index=%d" % (c, index))
+            self.course_list.SetItemData(index, k)
+        hbox2.Add(self.course_list, 1, wx.EXPAND|wx.RIGHT, border=10)
+
+        self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.CourseListSelected,
+                  source=self.course_list,
+                  id=wx.ID_ANY)
+
+        vbox.Add(hbox2, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
+
+        vbox.AddSpacer(10)
+
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
-        self.play_button = wx.Button(panel, label='Play a Round',
-                                     size=(150, 30))
+
+        date_label = wx.StaticText(panel, label='Date')
+
+        self.round_date = wx.DatePickerCtrl(panel, size=wx.Size(110,20))
+
+        self.score_button = wx.Button(panel, label='Score a Round')
         self.Bind(wx.EVT_BUTTON, self.ButtonPressed,
-                  source=self.play_button, id=wx.ID_ANY)
-        #self.play_button.Disable()
-        hbox3.Add(self.play_button)
-        vbox.Add(hbox3, flag=wx.CENTER|wx.ALIGN_CENTER, border=10)
+                  source=self.score_button)
+        self.score_button.Disable()
+
+        hbox3.Add(date_label)
+        hbox3.AddSpacer(5)
+        hbox3.Add(self.round_date)
+        hbox3.AddStretchSpacer(2)
+        hbox3.Add(self.score_button)
+
+        vbox.Add(hbox3, flag=wx.LEFT|wx.RIGHT|wx.EXPAND, border=10)
 
         panel.SetSizer(vbox)
 
-    def ListSelected(self, e):
-        dprint("List Item [%d] Selected" % e.Index)
-        self.list.Select(e.Index, False)
-        self.list.ToggleItem(e.Index)
-        #self.list.CheckItem(e.Index, not self.list.IsChecked(e.Index))
-        #self.play_button.Enable()
+
+    def SetScoreButtonState(self):
+        '''Set appropriate state for the "Score" Button'''
+        i = self.course_list.GetFirstSelected()
+        dprint("Course Selected: %d; Players Selected: %d" % \
+               (i, self.player_list.item_check_count))
+        if i >= 0 and self.player_list.item_check_count > 0:
+            self.score_button.Enable()
+        else:
+            self.score_button.Disable()
+
+    def PlayerListSelected(self, e):
+        dprint("Player[%d] Selected" % e.Index)
+        self.player_list.Select(e.Index, False)
+        self.player_list.ToggleItem(e.Index)
+        self.SetScoreButtonState()
+
+    def CourseListSelected(self, e):
+        dprint("Course[%d] Selected" % e.Index)
+        self.SetScoreButtonState()
 
     def ButtonPressed(self, e):
-        dprint("Button Pressed")
-        # need to get a list of all players selected
-        #self.PlayRound(player_list)
-        dprint("list of selection:", self.list.itemsChecked)
+        dprint("Button Pressed: %d players selected:" % \
+               self.player_list.item_check_count,
+               self.player_list.items_checked)
+        player_numbers = []
+        for (k, v) in self.player_list.items_checked.iteritems():
+            i = self.player_list.GetItemData(k)
+            if v:
+                dprint("Saving player number: %d" % i)
+                player_numbers.append(i)
+        dprint("Player number list:", player_numbers)
+        i = self.course_list.GetFirstSelected()
+        course_number = self.course_list.GetItemData(i)
+        dprint("Course number: %d" % course_number)
+        rdate = self.round_date.GetValue()
+        dprint("round date:", rdate)
+        self.ScoreRound(course_number, rdate, player_numbers)
+
+    def ScoreRound(self, course_number, rdate, player_numbers):
+        '''popup a window to enter the scores for round'''
+        dprint("ScoreRound: NOT YET IMPLEMENTED")
 
     def InitUI(self):
         self.SetUpPanel()
@@ -230,8 +213,9 @@ class SetupRoundFrame(wx.Frame):
 def main():
     rdb.initDB()
     app = wx.App()
-    ChooseCourseFrame(None, title='Disc Golf DB')
+    SetupRoundFrame(None, title='Disc Golf Database')
     app.MainLoop()
+
 
 if __name__ == '__main__':
     opts.debug = True

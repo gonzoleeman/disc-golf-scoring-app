@@ -95,7 +95,7 @@ RoundDetailList = {}
 #
 # database routines (use a 'class'?)
 #
-def initDB():
+def init_db():
     global CourseList
     global PlayerList
     global RoundList

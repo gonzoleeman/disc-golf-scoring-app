@@ -4,28 +4,34 @@ Python script to present a Disc Golf GUI, that allows
 us to keep track of courses and holes on that course
 
 TO DO:
-    - Create Menu items:
-      - File -- to change DB file open, save, and Quit
-      - Help -- empty for now
-    - Check for options (e.g. "--debug|-d") at startup
-    - support DB modification for Courses
-    - implement real help?
-
-    - Figure out how to save state when quitting, i.e.
-      the "current" DB, course, hole, and perhaps other
-      preferences -- might need a ~/.dg file?
-
-    - Add catching window close event
-    - Add pictures to DB some day? (e.g. for start screen?)
-    - Properly package for distribution
-
-    - implement windows for:
-      * scoring a round
-      * looking at a round (same?)
-      * looking at results (with graph(s)?)
+    - implement "play a round" GUI
+    - implement "look at a round" GUI
+    - implement updating the database
+    - implement saving the database
+    - implement opening a new database
+    - implement looking at results GUI
 
     - make setup window go away when scoring a round (use
       same window, with tabs or something?)
+
+    - "are you sure" popup if exit with database modified
+
+    - implement "About" popup
+
+    - support DB modification for Courses (some day)
+
+    -------------------------------
+
+    - Properly package for distribution
+
+    - implement real help? (like what?)
+
+    - Add pictures to DB some day? (e.g. for start screen?)
+
+    - preferences? not really needed yet: nothing to configure/prefer
+
+    - disable/enable menu choices as DB gets modified/saved
+      (not needed?)
 
 History:
     Version 1.0: menu bar present, hooked up, but on
@@ -36,35 +42,50 @@ History:
         detection, list edit buttons, and button enable/disable
     version 1.3: trynig to get it arranged correctly
     version 1.4: getting closer: setting up a round correctly now
+    version 1.5: have the scoring window populated now!
 '''
 
 import sys
+from optparse import OptionParser
 import wx
-from wx.lib.mixins.listctrl import ListCtrlAutoWidthMixin, CheckListCtrlMixin
-
+import wx.lib.mixins.listctrl as wxlc
+from wx.lib.mixins.listctrl import TextEditMixin
 import rdb
 from utils import dprint
 from opts import opts
 
 
 __author__ = "Lee Duncan"
-__version__ = "1.4"
+__version__ = "1.5"
 
 
 
-class AutoWidthListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin):
+class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
+                            wxlc.TextEditMixin):
     def __init__(self, parent):
         wx.ListCtrl.__init__(self, parent, -1,
                              style=wx.LC_REPORT|wx.LC_SINGLE_SEL, size=(10,10))
-        ListCtrlAutoWidthMixin.__init__(self)
+        wxlc.ListCtrlAutoWidthMixin.__init__(self)
+        wxlc.TextEditMixin.__init__(self)
 
-class AutoWidthCheckListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin,
-                             CheckListCtrlMixin):
+    def OpenEditor(self, col, row):
+        dprint("Edit row:%d, col:%d" % (row, col))
+        if col in (1, 2, 3, 4):
+            wxlc.TextEditMixin.OpenEditor(self, col, row)
+
+class AutoWidthListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin):
+    def __init__(self, parent):
+        wx.ListCtrl.__init__(self, parent, -1,
+                             style=wx.LC_REPORT|wx.LC_SINGLE_SEL, size=(10,10))
+        wxlc.ListCtrlAutoWidthMixin.__init__(self)
+
+class AutoWidthCheckListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
+                             wxlc.CheckListCtrlMixin):
     def __init__(self, parent):
         wx.ListCtrl.__init__(self, parent, -1,
                              style=wx.LC_REPORT|wx.CONTROL_CHECKED)
-        CheckListCtrlMixin.__init__(self)
-        ListCtrlAutoWidthMixin.__init__(self)
+        wxlc.ListCtrlAutoWidthMixin.__init__(self)
+        wxlc.CheckListCtrlMixin.__init__(self)
         self.Bind(wx.EVT_LIST_COL_CLICK, self.OnCheckItem)
         self.items_checked = {}
         self.item_check_count = 0
@@ -73,25 +94,23 @@ class AutoWidthCheckListCtrl(wx.ListCtrl, ListCtrlAutoWidthMixin,
         dprint("Setting items_checked[%d] = %s" % (data, flag))
         self.items_checked[data] = flag
         if flag:
-            self.item_check_count = self.item_check_count + 1
+            self.item_check_count += 1
         else:
-            self.item_check_count = self.item_check_count - 1
+            self.item_check_count -= 1
 
 
 class SetupRoundFrame(wx.Frame):
     def __init__(self, *args, **kwargs):
         super(SetupRoundFrame, self).__init__(*args, **kwargs)
-        self.SetSize((400, 300))
+        self.SetSize((wx.Size(400, 300)))
         self.InitUI()
+        self.Bind(wx.EVT_CLOSE, self.OnQuit)
 
     def SetUpPanel(self):
-        '''
-        Set up the main (panel) window of the GUI
-        '''
         panel = wx.Panel(self, style=wx.SIMPLE_BORDER)
 
-        font = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
-        font.SetPointSize(14)
+        big_font = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
+        big_font.SetPointSize(14)
 
         vbox = wx.BoxSizer(wx.VERTICAL)
 
@@ -99,9 +118,14 @@ class SetupRoundFrame(wx.Frame):
 
         hbox1 = wx.BoxSizer(wx.HORIZONTAL)
         st1 = wx.StaticText(panel, label='Round Setup')
-        st1.SetFont(font)
+        st1.SetFont(big_font)
         hbox1.Add(st1, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=10)
         vbox.Add(hbox1, flag=wx.CENTER|wx.ALIGN_CENTER)
+
+        vbox.AddSpacer(10)
+
+        sl = wx.StaticLine(panel, size=wx.Size(400, 1))
+        vbox.Add(sl, flag=wx.CENTER|wx.ALIGN_CENTER)
 
         vbox.AddSpacer(10)
 
@@ -202,21 +226,202 @@ class SetupRoundFrame(wx.Frame):
 
     def ScoreRound(self, course_number, rdate, player_numbers):
         '''popup a window to enter the scores for round'''
-        dprint("ScoreRound: NOT YET IMPLEMENTED")
+        srf = ScoreRoundFrame(self, title='Score a Round')
+        srf.Create(course_number, rdate, player_numbers)
+
+    def DBUpdate(self, e):
+        '''A DB Update menu item has been choosen'''
+        dprint('DBUpdate: id=', e.GetId())
+        if e.GetId() == wx.ID_OPEN:
+            dprint("open a new datbase: NOT YET IMPLEMENTED")
+        else:
+            dprint("save the current datbase: NOT YET IMPLEMENTED")
+
+    def SetUpMenuBar(self):
+        mbar = wx.MenuBar()
+
+        # create the 'File' menu and fill it in
+        fmenu = wx.Menu()
+
+        omi = wx.MenuItem(fmenu, wx.ID_OPEN, '&Open')
+        fmenu.AppendItem(omi)
+        self.Bind(wx.EVT_MENU, self.DBUpdate, omi, wx.ID_OPEN)
+
+        smi = wx.MenuItem(fmenu, wx.ID_SAVE, '&Save')
+        fmenu.AppendItem(smi)
+        self.Bind(wx.EVT_MENU, self.DBUpdate, smi, wx.ID_SAVE)
+
+        fmenu.AppendSeparator()
+
+        qmi = wx.MenuItem(fmenu, wx.ID_EXIT, '&Quit')
+        fmenu.AppendItem(qmi)
+        self.Bind(wx.EVT_MENU, self.OnQuit, qmi, wx.ID_EXIT)
+
+        accel_tbl = wx.AcceleratorTable([\
+                (wx.ACCEL_CTRL, ord('Q'), wx.ID_EXIT),
+                (wx.ACCEL_CTRL, ord('O'), wx.ID_OPEN),
+                (wx.ACCEL_CTRL, ord('S'), wx.ID_SAVE),
+                ])
+        self.SetAcceleratorTable(accel_tbl)
+        mbar.Append(fmenu, '&File')
+
+        # create the help menu
+        hmenu = wx.Menu()
+        hmi = wx.MenuItem(hmenu, wx.ID_ABOUT, 'About')
+        hmenu.AppendItem(hmi)
+        self.Bind(wx.EVT_MENU, self.OnAbout, hmi, wx.ID_ABOUT)
+        mbar.Append(hmenu, '&Help')
+
+        self.SetMenuBar(mbar)
+
+    def OnAbout(self, e):
+        dprint('About ... NOT YET IMPLEMENTED')
+
+    def OnQuit(self, e):
+        # XXX Need to check for database modified here, with a popup?
+        dprint("QUITing ...")
+        self.Destroy()
 
     def InitUI(self):
+        self.SetUpMenuBar()
         self.SetUpPanel()
         self.Show(True)
         dprint("GUI Initialized")
 
 
+class ScoreRoundFrame(wx.Frame):
+    def __init__(self, *args, **kwargs):
+        super(ScoreRoundFrame, self).__init__(*args, **kwargs)
+
+    def Create(self, cnum, rdate, plist):
+        self.SetSize(wx.Size(500, 300))
+        self.cnum = cnum
+        self.rdate = rdate
+        self.plist = plist
+        dprint("Course number: %d, round date: %s" % (cnum, rdate))
+        dprint("Player numbers:", plist)
+        self.InitUI()
+
+    def SetUpPanel(self):
+        panel = wx.Panel(self, style=wx.SIMPLE_BORDER)
+
+        big_font = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
+        big_font.SetPointSize(14)
+
+        vbox = wx.BoxSizer(wx.VERTICAL)
+
+        vbox.AddSpacer(10)
+
+        hbox1 = wx.BoxSizer(wx.HORIZONTAL)
+        st1 = wx.StaticText(panel, label='Round Scoring')
+        st1.SetFont(big_font)
+        hbox1.Add(st1, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=10)
+        vbox.Add(hbox1, flag=wx.CENTER|wx.ALIGN_CENTER)
+
+        vbox.AddSpacer(10)
+
+        sl = wx.StaticLine(panel, size=wx.Size(400, 1))
+        vbox.Add(sl, flag=wx.CENTER|wx.ALIGN_CENTER)
+
+        vbox.AddSpacer(10)
+
+        hbox2 = wx.BoxSizer(wx.HORIZONTAL)
+
+        bold_font = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
+        bold_font.SetWeight(wx.FONTWEIGHT_BOLD)
+
+        st2 = wx.StaticText(panel, label='Round Date: ')
+        st2.SetFont(bold_font)
+        st3 = wx.StaticText(panel, label=self.rdate.Format('%m/%d/%Y'))
+
+        st4 = wx.StaticText(panel, label='Location: ')
+        st4.SetFont(bold_font)
+        st5 = wx.StaticText(panel, label=rdb.CourseList[self.cnum].name)
+
+        hbox2.AddSpacer(20)
+        hbox2.Add(st2)
+        hbox2.Add(st3)
+        hbox2.AddStretchSpacer(2)
+        hbox2.Add(st4)
+        hbox2.Add(st5)
+        hbox2.AddSpacer(20)
+
+        vbox.Add(hbox2, flag=wx.LEFT|wx.RIGHT|wx.EXPAND, border=10)
+
+        hbox3 = wx.BoxSizer(wx.HORIZONTAL)
+        self.score_list = AutoWidthListEditCtrl(panel)
+        self.score_list.InsertColumn(0, 'Name', width=100)
+        self.score_list.InsertColumn(1, 'Front 9', width=75)
+        self.score_list.InsertColumn(2, 'Back 9', width=75)
+        self.score_list.InsertColumn(3, 'Aces', width=75)
+        self.score_list.InsertColumn(4, 'Eagles', width=75)
+        self.score_list.InsertColumn(5, 'Score', width=75)
+        cnt = 0
+        for c in self.plist:
+            player = rdb.PlayerList[c].name
+            self.score_list.InsertStringItem(cnt, player)
+            self.score_list.SetStringItem(cnt, 1, "?")
+            self.score_list.SetStringItem(cnt, 2, "?")
+            self.score_list.SetStringItem(cnt, 3, "0")
+            self.score_list.SetStringItem(cnt, 4, "0")
+            self.score_list.SetStringItem(cnt, 5, "0")
+            cnt += 1
+        hbox3.Add(self.score_list, 1, wx.EXPAND|wx.ALL, border=10)
+
+        vbox.Add(hbox3, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
+
+        hbox4 = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.cancel_button = wx.Button(panel, id=wx.ID_CANCEL, label='Cancel')
+        self.commit_button = wx.Button(panel, id=wx.ID_SAVE, label='Commit')
+        self.calc_button = wx.Button(panel, id=wx.ID_SETUP,
+                                          label='Calculate')
+
+        self.Bind(wx.EVT_BUTTON, self.Cancel, source=self.cancel_button)
+        self.Bind(wx.EVT_BUTTON, self.Commit, source=self.commit_button)
+        self.Bind(wx.EVT_BUTTON, self.Calculate, source=self.calc_button)
+
+        hbox4.AddSpacer(10)
+        hbox4.Add(self.cancel_button)
+        hbox4.AddStretchSpacer(1)
+        hbox4.Add(self.commit_button)
+        hbox4.AddStretchSpacer(1)
+        hbox4.Add(self.calc_button)
+
+        vbox.Add(hbox4, flag=wx.LEFT|wx.RIGHT|wx.EXPAND, border=10)
+
+        panel.SetSizer(vbox)
+
+    def Commit(self, e):
+        dprint("Commit DB: NOT YET IMPLEMENTED")
+
+    def Calculate(self, e):
+        dprint("Calculate results: NOT YET IMPLEMENTED")
+
+    def Cancel(self, e):
+        self.Close()
+
+    def InitUI(self):
+        self.SetUpPanel()
+        self.Show(True)
+
+
+def parse_options():
+    parser = OptionParser(version='%prog ' + __version__,
+                          usage='usage: %prog [options]',
+                          description='Disc Golf Database')
+    parser.add_option('-d', '--debug', action='store_true',
+                      help='enter debug mode [%default]')
+    (o, a) = parser.parse_args()
+    opts.debug = o.debug
+
 def main():
-    rdb.initDB()
+    parse_options()
+    rdb.init_db()
     app = wx.App()
     SetupRoundFrame(None, title='Disc Golf Database')
     app.MainLoop()
 
 
 if __name__ == '__main__':
-    opts.debug = True
     main()

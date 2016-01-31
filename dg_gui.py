@@ -53,11 +53,11 @@ History:
     version 1.5: have the scoring window populated now!
 '''
 
+
 import sys
 from optparse import OptionParser
 import wx
 import wx.lib.mixins.listctrl as wxlc
-from wx.lib.mixins.listctrl import TextEditMixin
 import re
 
 import rdb
@@ -66,24 +66,50 @@ from opts import opts
 import score
 
 
+
 __author__ = "Lee Duncan"
 __version__ = "1.5"
 
 
 class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
-                            wxlc.TextEditMixin):
+                            wxlc.TextEditMixin, wxlc.ColumnSorterMixin):
     def __init__(self, parent):
         wx.ListCtrl.__init__(self, parent, -1,
-                            style=wx.LC_REPORT|wx.LC_SINGLE_SEL, size=(10,10))
+                            style=wx.LC_REPORT|wx.LC_SINGLE_SEL,
+                             size=wx.Size(10,10))
         wxlc.ListCtrlAutoWidthMixin.__init__(self)
-        wxlc.TextEditMixin.__init__(self)
+        wxlc.ColumnSorterMixin.__init__(self, 1)
         self.num_re = re.compile('[+-]?[0-9]+$')
         self.Bind(wx.EVT_LIST_BEGIN_LABEL_EDIT, self.CheckEdit)
+
+    def SetupList(self, itemHdr, itemData):
+        self.itemDataMap = itemData
+        self.itemHdr = itemHdr
+        num_columns = len(self.itemHdr)
+        col_width = 100
+        for col_idx in range(num_columns):
+            dprint("Setting column %d hdr to %s" % (col_idx,
+                                                    self.itemHdr[col_idx]))
+            self.InsertColumn(col_idx, self.itemHdr[col_idx], width=col_width)
+            col_width = 75
+        data_idx = 0
+        for key, data in self.itemDataMap.items():
+            dprint("Filling in row %d with key=%d:" % (data_idx, key), data)
+            self.InsertStringItem(data_idx, data[0])
+            for col_idx in range(1, num_columns):
+                self.SetStringItem(data_idx, col_idx, data[col_idx])
+            self.SetItemData(data_idx, key)
+            data_idx += 1
+        wxlc.TextEditMixin.__init__(self)
+        self.SetColumnCount(num_columns)
+
+    def GetListCtrl(self):
+        return self
 
     def CheckEdit(self, evt):
         dprint("Should we edit col=%d" % evt.m_col)
         if evt.m_col in (1, 2, 3, 4):
-            dprint("Allowin edit of column %d" % evt.m_col)
+            dprint("ALLOWing edit of column %d" % evt.m_col)
             evt.Allow()
         else:
             dprint("VETOing edit of column %d" % evt.m_col)
@@ -110,7 +136,8 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
 class AutoWidthListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin):
     def __init__(self, parent):
         wx.ListCtrl.__init__(self, parent, -1,
-                             style=wx.LC_REPORT|wx.LC_SINGLE_SEL, size=(10,10))
+                             style=wx.LC_REPORT|wx.LC_SINGLE_SEL,
+                             size=wx.Size(10,10))
         wxlc.ListCtrlAutoWidthMixin.__init__(self)
 
 class AutoWidthCheckListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
@@ -136,7 +163,7 @@ class AutoWidthCheckListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
 class SetupRoundFrame(wx.Frame):
     def __init__(self, *args, **kwargs):
         super(SetupRoundFrame, self).__init__(*args, **kwargs)
-        self.SetSize((wx.Size(400, 300)))
+        self.SetSize((wx.Size(400, 400)))
         self.InitUI()
         self.Bind(wx.EVT_CLOSE, self.OnQuit)
 
@@ -194,7 +221,7 @@ class SetupRoundFrame(wx.Frame):
         vbox.AddSpacer(10)
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
         date_label = wx.StaticText(panel, label='Date')
-        self.round_date = wx.DatePickerCtrl(panel, size=wx.Size(110,20))
+        self.round_date = wx.DatePickerCtrl(panel, size=wx.Size(110, 20))
         self.score_button = wx.Button(panel, label='Score a Round')
         self.Bind(wx.EVT_BUTTON, self.ButtonPressed,
                   source=self.score_button)
@@ -366,24 +393,28 @@ class ScoreRoundFrame(wx.Frame):
         ################################################################
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
         self.score_list = AutoWidthListEditCtrl(panel)
-        self.score_list.InsertColumn(0, 'Name', width=100)
+        itemHdr = ['Name', 'Front 9', 'Back 9', 'Aces', 'Eagles', 'Score']
+        self.score_list.InsertColumn(0, 'Name', width=75)
         self.score_list.InsertColumn(1, 'Front 9', width=75)
         self.score_list.InsertColumn(2, 'Back 9', width=75)
         self.score_list.InsertColumn(3, 'Aces', width=75)
         self.score_list.InsertColumn(4, 'Eagles', width=75)
         self.score_list.InsertColumn(5, 'Score', width=75)
-        cnt = 0
+        itemData = {}
+        #cnt = 0
         for c in self.pnum_list:
             player = rdb.PlayerList[c]
             round = rdb.RoundDetail(self.this_round.num, player.num, 0, 0)
             self.round_details.append(round)
-            self.score_list.InsertStringItem(cnt, player.name)
-            self.score_list.SetStringItem(cnt, 1, "None")
-            self.score_list.SetStringItem(cnt, 2, "None")
-            self.score_list.SetStringItem(cnt, 3, "0")
-            self.score_list.SetStringItem(cnt, 4, "0")
-            self.score_list.SetStringItem(cnt, 5, "0")
-            cnt += 1
+            itemData[player.num] = (player.name, "None", "None", "0", "0", "0")
+            #self.score_list.InsertStringItem(cnt, player.name)
+            #self.score_list.SetStringItem(cnt, 1, "None")
+            #self.score_list.SetStringItem(cnt, 2, "None")
+            #self.score_list.SetStringItem(cnt, 3, "0")
+            #self.score_list.SetStringItem(cnt, 4, "0")
+            #self.score_list.SetStringItem(cnt, 5, "0")
+            #cnt += 1
+        self.score_list.SetupList(itemHdr, itemData)
         hbox3.Add(self.score_list, 1, wx.EXPAND|wx.ALL, border=10)
         vbox.Add(hbox3, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
         ################################################################
@@ -442,6 +473,8 @@ class ScoreRoundFrame(wx.Frame):
             self.status_bar.SetStatusText("")
         dprint("All fields OK! scoring ...")
         scored_details = score.score_round(self.round_details)
+        for d in scored_details:
+            dprint("Score Details Calculated:", d)
 
     def Cancel(self, e):
         self.Close()

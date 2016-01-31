@@ -79,7 +79,7 @@ class RoundDetail:
         self.ace_cnt = acnt
         self.eagle_cnt = ecnt
         self.overall = self.front_score + self.back_score
-        # this is the CALCULATED score
+        # this is the CALCULATED *FLOATING POINT* score
         self.score = 0
 
     def __eq__(self, other):
@@ -91,17 +91,11 @@ class RoundDetail:
         self.back_score = bscore
         self.overall = self.front_score + self.back_score
 
-#    def __repr__(self):
-#        return ((str(self.round_num), str(self.player_num),
-#                 str(self.front_score), str(self.back_score),
-#                 str(self.ace_cnt), str(self.eagle_cnt),
-#                 str(self.overall), str(self.score)))
-
     def __str__(self):
-        return "RoundDetail[round=%d]: pnum=%d, score=%d/%d->%d, a/e=%d/%d" % \
+        return "RoundDetail[round=%d]: pnum=%d, score=%d/%d->%d, a/e=%d/%d => %f" % \
                (self.round_num, self.player_num,
                 self.front_score, self.back_score, self.overall,
-                self.ace_cnt, self.eagle_cnt)
+                self.ace_cnt, self.eagle_cnt, self.score)
 
 DB_DIR = 'db'
 DB_FILE = 'disc_golf.db'

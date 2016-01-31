@@ -18,7 +18,7 @@ def score_round(round_list):
     detail object list with scores filled in for the front9 round, the
     back9 round, andthe overall
     '''
-    dprint("ScoreRound: entering")
+    dprint("score_round: *** ENTERING ***")
 
     # get sorted round lists
     front_list = sorted(round_list, key=lambda rdetail: rdetail.front_score)
@@ -34,9 +34,8 @@ def score_round(round_list):
     ttl_score_results = calculate_score(ttl_score_list, OVERALL_SCORES)
     # fill in ttl_list with overall totals
 
-    # XXX now add all three lists to get result
-    rnds = len(round_list)
-    rnd_idx = 0
+    # now add all three lists to get result
+    dprint("score_round: *** 3-way Merge ***")
     for rnd in round_list:
         dprint("Scoring for:", rnd)
         idx = 0
@@ -45,23 +44,23 @@ def score_round(round_list):
             if rnd == frnd:
                 break
             idx += 1
-        round_list[rnd_idx].score = front_score_results[idx]
+        # assume there *will* be a match
+        rnd.score = front_score_results[idx]
         idx = 0
         for brnd in back_list:
             dprint("Comparing against back round (idx=%d):" % idx, brnd)
             if rnd == brnd:
                 break
             idx += 1
-        round_list[rnd_idx].score += back_score_results[idx]
+        rnd.score += back_score_results[idx]
         idx = 0
         for trnd in ttl_list:
             dprint("Comparing against ttl (idx=%d):" % idx, trnd)
             if rnd == trnd:
                 break
             idx += 1
-        round_list[rnd_idx].score += ttl_score_results[idx]
-        dprint("Score for this round/player: %d" % rnd.score)
-        rnd_idx += 1
+        rnd.score += ttl_score_results[idx]
+        dprint("Score for this round/player: %f" % rnd.score)
 
     #dprint("Returning overall results:", round_list)
     return round_list
@@ -81,7 +80,7 @@ def calculate_score(score_list, score_values):
     # we run out of places (5 of them) or score details (not enough
     # players)
     #
-    dprint("*** SCORING ***")
+    dprint("calculate_score: *** SCORING ***")
     results = []
     idx = 0
     for k in scores_seen.iterkeys():

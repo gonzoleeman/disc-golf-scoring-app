@@ -25,7 +25,9 @@ __author__ = "Lee Duncan"
 
 from utils import dprint
 from opts import opts
+
 import sqlite3
+
 
 class Course:
     '''
@@ -76,11 +78,29 @@ class RoundDetail:
         self.back_score = bscore
         self.ace_cnt = acnt
         self.eagle_cnt = ecnt
+        self.overall = self.front_score + self.back_score
+        # this is the CALCULATED score
+        self.score = 0
+
+    def __eq__(self, other):
+        return self.round_num == other.round_num and \
+               self.player_num == other.player_num
+
+    def SetScore(self, fscore, bscore):
+        self.front_score = fscore
+        self.back_score = bscore
+        self.overall = self.front_score + self.back_score
+
+#    def __repr__(self):
+#        return ((str(self.round_num), str(self.player_num),
+#                 str(self.front_score), str(self.back_score),
+#                 str(self.ace_cnt), str(self.eagle_cnt),
+#                 str(self.overall), str(self.score)))
 
     def __str__(self):
-        return "Round[%d]: player=%d, score=%d/%d, a/e=%d/%d" % \
+        return "RoundDetail[round=%d]: pnum=%d, score=%d/%d->%d, a/e=%d/%d" % \
                (self.round_num, self.player_num,
-                self.front_score, self.back_score,
+                self.front_score, self.back_score, self.overall,
                 self.ace_cnt, self.eagle_cnt)
 
 DB_DIR = 'db'
@@ -92,16 +112,20 @@ PlayerList = {}
 RoundList = {}
 RoundDetailList = {}
 
+RoundNumberMax = 0
+
 #
 # database routines (use a 'class'?)
 #
 def init_db():
+    '''Initialize the DG Database'''
+
     global CourseList
     global PlayerList
     global RoundList
     global RoundDetailList
-    
-    '''Initialize the DG Database'''
+    global RoundNumberMax
+
     dprint("Initializing the Database (%s) ..." % DB_PATH)
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -120,4 +144,18 @@ def init_db():
         course_num = row[1]
         dprint("Adding round[%d]: Course=%s, %s" % \
                (round_num, course_num, row[2]))
-        RoundList[round_num] = Round(player_num, course_num, row[2])
+        RoundList[round_num] = Round(round_num, course_num, row[2])
+        if round_num > RoundNumberMax:
+            RoundNumberMax = round_num
+    dprint("Round Number max seen: %d" % RoundNumberMax)
+    # XXX round details? -- NOT YET IMPLEMENTED
+
+def next_round_num():
+    global RoundNumberMax
+
+    RoundNumberMax += 1
+    return RoundNumberMax
+
+def create_new_round(course_num, round_date):
+    new_round = Round(new_round_num, course_num, round_date)
+    return new_round

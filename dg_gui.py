@@ -81,27 +81,30 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
         wxlc.ColumnSorterMixin.__init__(self, 1)
         self.num_re = re.compile('[+-]?[0-9]+$')
         self.Bind(wx.EVT_LIST_BEGIN_LABEL_EDIT, self.CheckEdit)
+        self.num_columns = 0
 
-    def SetupList(self, itemHdr, itemData):
-        self.itemDataMap = itemData
-        self.itemHdr = itemHdr
-        num_columns = len(self.itemHdr)
+    def SetupListHdr(self, itemHdr):
+        self.num_columns = len(itemHdr)
         col_width = 100
-        for col_idx in range(num_columns):
+        for col_idx in range(self.num_columns):
             dprint("Setting column %d hdr to %s" % (col_idx,
-                                                    self.itemHdr[col_idx]))
-            self.InsertColumn(col_idx, self.itemHdr[col_idx], width=col_width)
+                                                    itemHdr[col_idx]))
+            self.InsertColumn(col_idx, itemHdr[col_idx], width=col_width)
             col_width = 75
+        self.SetColumnCount(self.num_columns)
+
+    def SetupListItems(self, itemData):
+        self.DeleteAllItems()
+        self.itemDataMap = itemData
         data_idx = 0
         for key, data in self.itemDataMap.items():
             dprint("Filling in row %d with key=%d:" % (data_idx, key), data)
             self.InsertStringItem(data_idx, data[0])
-            for col_idx in range(1, num_columns):
+            for col_idx in range(1, self.num_columns):
                 self.SetStringItem(data_idx, col_idx, data[col_idx])
             self.SetItemData(data_idx, key)
             data_idx += 1
         wxlc.TextEditMixin.__init__(self)
-        self.SetColumnCount(num_columns)
 
     def GetListCtrl(self):
         return self
@@ -394,27 +397,14 @@ class ScoreRoundFrame(wx.Frame):
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
         self.score_list = AutoWidthListEditCtrl(panel)
         itemHdr = ['Name', 'Front 9', 'Back 9', 'Aces', 'Eagles', 'Score']
-        self.score_list.InsertColumn(0, 'Name', width=75)
-        self.score_list.InsertColumn(1, 'Front 9', width=75)
-        self.score_list.InsertColumn(2, 'Back 9', width=75)
-        self.score_list.InsertColumn(3, 'Aces', width=75)
-        self.score_list.InsertColumn(4, 'Eagles', width=75)
-        self.score_list.InsertColumn(5, 'Score', width=75)
+        self.score_list.SetupListHdr(itemHdr)
         itemData = {}
-        #cnt = 0
         for c in self.pnum_list:
             player = rdb.PlayerList[c]
             round = rdb.RoundDetail(self.this_round.num, player.num, 0, 0)
             self.round_details.append(round)
             itemData[player.num] = (player.name, "None", "None", "0", "0", "0")
-            #self.score_list.InsertStringItem(cnt, player.name)
-            #self.score_list.SetStringItem(cnt, 1, "None")
-            #self.score_list.SetStringItem(cnt, 2, "None")
-            #self.score_list.SetStringItem(cnt, 3, "0")
-            #self.score_list.SetStringItem(cnt, 4, "0")
-            #self.score_list.SetStringItem(cnt, 5, "0")
-            #cnt += 1
-        self.score_list.SetupList(itemHdr, itemData)
+        self.score_list.SetupListItems(itemData)
         hbox3.Add(self.score_list, 1, wx.EXPAND|wx.ALL, border=10)
         vbox.Add(hbox3, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
         ################################################################
@@ -438,6 +428,7 @@ class ScoreRoundFrame(wx.Frame):
         panel.SetSizer(vbox)
         ################################################################
         self.status_bar = self.CreateStatusBar()
+        self.status_bar.SetStatusText("Please fill in the scores")
 
     def Commit(self, e):
         dprint("Commit DB: NOT YET IMPLEMENTED")
@@ -447,6 +438,7 @@ class ScoreRoundFrame(wx.Frame):
         cnt = self.score_list.GetItemCount()
         dprint("Our list has %d items" % cnt)
         for c in range(cnt):
+            dprint("Looking for round_detail index %d" % c)
             round_detail = self.round_details[c]
             dprint("Round Detail:", round_detail)
             pname = self.score_list.GetItemText(c)
@@ -464,17 +456,29 @@ class ScoreRoundFrame(wx.Frame):
                     loc = 'Front 9'
                 else:
                     loc = 'Back 9'
-                dprint("%s's %s invalid" % (pname, loc))
                 self.status_bar.SetStatusText("%s's %s invalid" % (pname, loc))
+                self.status_bar.SetBackgroundColour(wx.RED)
                 return
             self.round_details[c].SetScore(f9, b9)
             dprint("Front Nine for player %s: %d" % (pname, f9))
             dprint("Back Nine for player %s: %d" % (pname, b9))
             self.status_bar.SetStatusText("")
+            self.status_bar.SetBackgroundColour(wx.NullColour)
         dprint("All fields OK! scoring ...")
         scored_details = score.score_round(self.round_details)
         for d in scored_details:
             dprint("Score Details Calculated:", d)
+        self.round_details = scored_details
+        itemData = {}
+        for rnd in self.round_details:
+            player = rdb.PlayerList[rnd.player_num]
+            itemData[rnd.player_num] = (player.name,
+                                        str(rnd.front_score),
+                                        str(rnd.back_score),
+                                        str(rnd.ace_cnt),
+                                        str(rnd.eagle_cnt),
+                                        str(rnd.score))
+        self.score_list.SetupListItems(itemData)
 
     def Cancel(self, e):
         self.Close()

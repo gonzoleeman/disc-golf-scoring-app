@@ -80,8 +80,13 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
         wxlc.ListCtrlAutoWidthMixin.__init__(self)
         wxlc.ColumnSorterMixin.__init__(self, 1)
         self.num_re = re.compile('[+-]?[0-9]+$')
-        self.Bind(wx.EVT_LIST_BEGIN_LABEL_EDIT, self.CheckEdit)
+        self.Bind(wx.EVT_LIST_BEGIN_LABEL_EDIT, self.CheckEditBegin)
+        self.Bind(wx.EVT_LIST_END_LABEL_EDIT, self.CheckEditEnd)
         self.num_columns = 0
+        self.edited_callback = None
+
+    def SetEditedCallback(self, cb):
+        self.edited_callback = cb
 
     def SetupListHdr(self, itemHdr):
         self.num_columns = len(itemHdr)
@@ -109,14 +114,26 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
     def GetListCtrl(self):
         return self
 
-    def CheckEdit(self, evt):
-        dprint("Should we edit col=%d" % evt.m_col)
+    def CheckEditBegin(self, evt):
+        dprint("*** Checking edit (begin):", evt)
+        dprint("Should we edit col=%d, text=%s" % (evt.m_col, evt.Text))
         if evt.m_col in (1, 2, 3, 4):
             dprint("ALLOWing edit of column %d" % evt.m_col)
             evt.Allow()
+            self.before_edit = evt.Text
         else:
             dprint("VETOing edit of column %d" % evt.m_col)
             evt.Veto()
+
+    def CheckEditEnd(self, evt):
+        dprint("*** Checking edit (end):", evt)
+        dprint("Finished editing col=%d, text=%s" % (evt.m_col, evt.Text))
+        self.after_edit = evt.Text
+        if self.before_edit != self.after_edit:
+            dprint("Field has been EDITED!")
+            if self.edited_callback:
+                self.edited_callback()
+        evt.Allow()
 
     def GetFieldNumericValue(self, row, col):
         '''
@@ -408,12 +425,15 @@ class ScoreRoundFrame(wx.Frame):
         hbox3.Add(self.score_list, 1, wx.EXPAND|wx.ALL, border=10)
         vbox.Add(hbox3, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
         ################################################################
+        self.score_list.SetEditedCallback(self.ListEdited)
+        ################################################################
         hbox4 = wx.BoxSizer(wx.HORIZONTAL)
         self.cancel_button = wx.Button(panel, id=wx.ID_CANCEL, label='Cancel')
         self.commit_button = wx.Button(panel, id=wx.ID_SAVE, label='Commit')
         self.commit_button.Disable()
         self.calc_button = wx.Button(panel, id=wx.ID_SETUP,
                                           label='Calculate')
+        self.calc_button.Disable()
         self.Bind(wx.EVT_BUTTON, self.Cancel, source=self.cancel_button)
         self.Bind(wx.EVT_BUTTON, self.Commit, source=self.commit_button)
         self.Bind(wx.EVT_BUTTON, self.Calculate, source=self.calc_button)
@@ -479,9 +499,17 @@ class ScoreRoundFrame(wx.Frame):
                                         str(rnd.eagle_cnt),
                                         str(rnd.score))
         self.score_list.SetupListItems(itemData)
+        self.calc_button.Disable()
+        self.commit_button.Enable()
 
     def Cancel(self, e):
+        dprint("Cancel!")
         self.Close()
+
+    def ListEdited(self):
+        dprint("Our List has been Edited!!!")
+        self.calc_button.Enable()
+        self.commit_button.Disable()
 
     def InitUI(self):
         self.SetUpPanel()

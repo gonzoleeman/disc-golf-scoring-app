@@ -591,6 +591,8 @@ class ExamineRoundsFrame(wx.Frame):
             # round number
             dprint("Searching for players for round number: %d - NOT YET IMPLEMENTED" % rnd.num)
             player_cnt = 0
+            #for round_detail in rdb.RoundDetailList.iterkeys():
+            #    
             item_data[c] = (rnd.rdate, course_name, str(player_cnt))
         self.round_list.SetupListItems(item_data)
         hbox2.Add(self.round_list, 1, wx.EXPAND|wx.ALL, border=10)

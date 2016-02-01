@@ -59,6 +59,7 @@ import sys
 from optparse import OptionParser
 import wx
 import wx.lib.mixins.listctrl as wxlc
+import wx.lib.newevent as wxne
 import re
 
 import rdb
@@ -70,6 +71,9 @@ import score
 
 __author__ = "Lee Duncan"
 __version__ = "1.6"
+
+
+ListEditedEvent, EVT_LIST_EDITED_EVENT = wxne.NewCommandEvent()
 
 
 class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
@@ -84,10 +88,6 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
         self.Bind(wx.EVT_LIST_BEGIN_LABEL_EDIT, self.CheckEditBegin)
         self.Bind(wx.EVT_LIST_END_LABEL_EDIT, self.CheckEditEnd)
         self.num_columns = 0
-        self.edited_callback = None
-
-    def SetEditedCallback(self, cb):
-        self.edited_callback = cb
 
     def SetupListHdr(self, itemHdr):
         self.num_columns = len(itemHdr)
@@ -131,9 +131,12 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
         dprint("Finished editing col=%d, text=%s" % (evt.m_col, evt.Text))
         self.after_edit = evt.Text
         if self.before_edit != self.after_edit:
-            dprint("Field has been EDITED!")
-            if self.edited_callback:
-                self.edited_callback()
+            dprint("Sending a a custom event: list edited!")
+            new_evt = ListEditedEvent(self.GetId(),
+                                      message='list edited',
+                                      col=evt.m_col, row=evt.m_item)
+            wx.PostEvent(self.GetParent(), new_evt)
+        # allow all edits -- XXX probably not needed
         evt.Allow()
 
     def GetFieldNumericValue(self, row, col):
@@ -426,7 +429,8 @@ class ScoreRoundFrame(wx.Frame):
         hbox3.Add(self.score_list, 1, wx.EXPAND|wx.ALL, border=10)
         vbox.Add(hbox3, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
         ################################################################
-        self.score_list.SetEditedCallback(self.ListEdited)
+        self.Bind(EVT_LIST_EDITED_EVENT, self.ListEditedEvent,
+                  source=self.score_list)
         ################################################################
         hbox4 = wx.BoxSizer(wx.HORIZONTAL)
         self.cancel_button = wx.Button(panel, id=wx.ID_CANCEL, label='Cancel')
@@ -507,7 +511,7 @@ class ScoreRoundFrame(wx.Frame):
         dprint("Cancel!")
         self.Close()
 
-    def ListEdited(self):
+    def ListEditedEvent(self, evt):
         dprint("Our List has been Edited!!!")
         self.calc_button.Enable()
         self.commit_button.Disable()

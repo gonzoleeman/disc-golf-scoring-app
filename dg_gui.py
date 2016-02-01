@@ -20,13 +20,10 @@ TO DO:
     - support DB modification for Courses (some day)
 
     - for scoring window:
-      - validate when "Calculate" is choosen
-      - do not commit if calculation is needed
-      - enable/disable buttons as needed, i.e. commit button only when
-        there are changes, likewise with calculate
-      - implement "calculate"
       - implement "commit"
       - ask "are you sure" when cancel is choose on modified DB
+      - update to handle round updates, e.g. "Commit" might
+        become "Add/Update", depending on the purpose of the window
 
     -------------------------------
 
@@ -37,6 +34,8 @@ TO DO:
     - Add pictures to DB some day? (e.g. for start screen?)
 
     - preferences? not really needed yet: nothing to configure/prefer
+      - e.g. which players are "usually there"
+      - size of windows?
 
     - disable/enable menu choices as DB gets modified/saved
       (not needed?)
@@ -51,6 +50,8 @@ History:
     version 1.3: trynig to get it arranged correctly
     version 1.4: getting closer: setting up a round correctly now
     version 1.5: have the scoring window populated now!
+    version 1.6: now scoring but not saving to the database
+	i.e. "Commit" not yet implemented
 '''
 
 
@@ -68,7 +69,7 @@ import score
 
 
 __author__ = "Lee Duncan"
-__version__ = "1.5"
+__version__ = "1.6"
 
 
 class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,

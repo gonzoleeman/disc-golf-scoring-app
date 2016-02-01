@@ -51,7 +51,8 @@ History:
     version 1.4: getting closer: setting up a round correctly now
     version 1.5: have the scoring window populated now!
     version 1.6: now scoring but not saving to the database
-	i.e. "Commit" not yet implemented
+        i.e. "Commit" not yet implemented
+    version 1.7: add starting "round list" window
 '''
 
 
@@ -99,11 +100,11 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
             col_width = 75
         self.SetColumnCount(self.num_columns)
 
-    def SetupListItems(self, itemData):
+    def SetupListItems(self, item_data):
         self.DeleteAllItems()
-        self.itemDataMap = itemData
+        self.item_data_map = item_data
         data_idx = 0
-        for key, data in self.itemDataMap.items():
+        for key, data in self.item_data_map.items():
             dprint("Filling in row %d with key=%d:" % (data_idx, key), data)
             self.InsertStringItem(data_idx, data[0])
             for col_idx in range(1, self.num_columns):
@@ -157,12 +158,39 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
         return val
 
 
-class AutoWidthListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin):
+class AutoWidthListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
+                        wxlc.ColumnSorterMixin):
     def __init__(self, parent):
         wx.ListCtrl.__init__(self, parent, -1,
                              style=wx.LC_REPORT|wx.LC_SINGLE_SEL,
                              size=wx.Size(10,10))
         wxlc.ListCtrlAutoWidthMixin.__init__(self)
+
+    def GetListCtrl(self):
+        return self
+
+    def SetupListHdr(self, itemHdr):
+        self.num_columns = len(itemHdr)
+        col_width = 100
+        for col_idx in range(self.num_columns):
+            dprint("Setting column %d hdr to %s" % (col_idx,
+                                                    itemHdr[col_idx]))
+            self.InsertColumn(col_idx, itemHdr[col_idx], width=col_width)
+            col_width = 75
+        self.SetColumnCount(self.num_columns)
+
+    def SetupListItems(self, item_data):
+        self.DeleteAllItems()
+        self.item_data_map = item_data
+        data_idx = 0
+        for key, data in self.item_data_map.items():
+            dprint("Filling in row %d with key=%d:" % (data_idx, key), data)
+            self.InsertStringItem(data_idx, data[0])
+            for col_idx in range(1, self.num_columns):
+                self.SetStringItem(data_idx, col_idx, data[col_idx])
+            self.SetItemData(data_idx, key)
+            data_idx += 1
+
 
 class AutoWidthCheckListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
                              wxlc.CheckListCtrlMixin):
@@ -175,7 +203,10 @@ class AutoWidthCheckListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
         self.items_checked = {}
         self.item_check_count = 0
 
-    def OnCheckItem(self, data, flag):
+    def OnCheckItem(self, data, flag=None):
+        if flag is None:
+            dprint("Skipping item checked: no item!")
+            return
         dprint("Setting items_checked[%d] = %s" % (data, flag))
         self.items_checked[data] = flag
         if flag:
@@ -312,8 +343,6 @@ class SetupRoundFrame(wx.Frame):
             dprint("save the current datbase: NOT YET IMPLEMENTED")
 
     def SetUpMenuBar(self):
-        mbar = wx.MenuBar()
-
         # create the 'File' menu and fill it in
         fmenu = wx.Menu()
 
@@ -337,13 +366,16 @@ class SetupRoundFrame(wx.Frame):
                 (wx.ACCEL_CTRL, ord('S'), wx.ID_SAVE),
                 ])
         self.SetAcceleratorTable(accel_tbl)
-        mbar.Append(fmenu, '&File')
 
         # create the help menu
         hmenu = wx.Menu()
         hmi = wx.MenuItem(hmenu, wx.ID_ABOUT, 'About')
         hmenu.AppendItem(hmi)
         self.Bind(wx.EVT_MENU, self.OnAbout, hmi, wx.ID_ABOUT)
+
+        # create and fill in the mnu bar
+        mbar = wx.MenuBar()
+        mbar.Append(fmenu, '&File')
         mbar.Append(hmenu, '&Help')
 
         self.SetMenuBar(mbar)
@@ -364,6 +396,9 @@ class SetupRoundFrame(wx.Frame):
 
 
 class ScoreRoundFrame(wx.Frame):
+    '''
+    For Creating an entry for a new Round
+    '''
     def __init__(self, *args, **kwargs):
         super(ScoreRoundFrame, self).__init__(*args, **kwargs)
 
@@ -417,15 +452,15 @@ class ScoreRoundFrame(wx.Frame):
         ################################################################
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
         self.score_list = AutoWidthListEditCtrl(panel)
-        itemHdr = ['Name', 'Front 9', 'Back 9', 'Aces', 'Eagles', 'Score']
-        self.score_list.SetupListHdr(itemHdr)
-        itemData = {}
+        self.score_list.SetupListHdr(['Name', 'Front 9', 'Back 9',
+                                      'Aces', 'Eagles', 'Score'])
+        item_data = {}
         for c in self.pnum_list:
             player = rdb.PlayerList[c]
             round = rdb.RoundDetail(self.this_round.num, player.num, 0, 0)
             self.round_details.append(round)
-            itemData[player.num] = (player.name, "None", "None", "0", "0", "0")
-        self.score_list.SetupListItems(itemData)
+            item_data[player.num] = (player.name, "None", "None", "0", "0", "0")
+        self.score_list.SetupListItems(item_data)
         hbox3.Add(self.score_list, 1, wx.EXPAND|wx.ALL, border=10)
         vbox.Add(hbox3, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
         ################################################################
@@ -494,16 +529,16 @@ class ScoreRoundFrame(wx.Frame):
         for d in scored_details:
             dprint("Score Details Calculated:", d)
         self.round_details = scored_details
-        itemData = {}
+        item_data = {}
         for rnd in self.round_details:
             player = rdb.PlayerList[rnd.player_num]
-            itemData[rnd.player_num] = (player.name,
+            item_data[rnd.player_num] = (player.name,
                                         str(rnd.front_score),
                                         str(rnd.back_score),
                                         str(rnd.ace_cnt),
                                         str(rnd.eagle_cnt),
                                         str(rnd.score))
-        self.score_list.SetupListItems(itemData)
+        self.score_list.SetupListItems(item_data)
         self.calc_button.Disable()
         self.commit_button.Enable()
 
@@ -515,6 +550,54 @@ class ScoreRoundFrame(wx.Frame):
         dprint("Our List has been Edited!!!")
         self.calc_button.Enable()
         self.commit_button.Disable()
+
+    def InitUI(self):
+        self.SetUpPanel()
+        self.Show(True)
+
+class ExamineRoundsFrame(wx.Frame):
+    def __init__(self, *args, **kwargs):
+        super(ExamineRoundsFrame, self).__init__(*args, **kwargs)
+        self.SetSize(wx.Size(500, 300))
+        self.InitUI()
+
+    def SetUpPanel(self):
+        panel = wx.Panel(self, style=wx.SIMPLE_BORDER)
+        ################################################################
+        vbox = wx.BoxSizer(wx.VERTICAL)
+        ################################################################
+        vbox.AddSpacer(10)
+        big_font = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
+        big_font.SetPointSize(14)
+        hbox1 = wx.BoxSizer(wx.HORIZONTAL)
+        st1 = wx.StaticText(panel, label='Current Rounds')
+        st1.SetFont(big_font)
+        hbox1.Add(st1, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=10)
+        vbox.Add(hbox1, flag=wx.CENTER|wx.ALIGN_CENTER)
+        ################################################################
+        vbox.AddSpacer(10)
+        sl = wx.StaticLine(panel, size=wx.Size(400, 1))
+        vbox.Add(sl, flag=wx.CENTER|wx.ALIGN_CENTER)
+        ################################################################
+        vbox.AddSpacer(10)
+        hbox2 = wx.BoxSizer(wx.HORIZONTAL)
+        self.round_list = AutoWidthListCtrl(panel)
+        self.round_list.SetupListHdr(['Date', 'Course', 'Players'])
+        item_data = {}
+        for c in rdb.RoundList.iterkeys():
+            rnd = rdb.RoundList[c]
+            course_name = rdb.CourseList[rnd.course_num].name
+            # XXX get count of all players that match this
+            # round number
+            dprint("Searching for players for round number: %d - NOT YET IMPLEMENTED" % rnd.num)
+            player_cnt = 0
+            item_data[c] = (rnd.rdate, course_name, str(player_cnt))
+        self.round_list.SetupListItems(item_data)
+        hbox2.Add(self.round_list, 1, wx.EXPAND|wx.ALL, border=10)
+        vbox.Add(hbox2, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
+        ################################################################
+        panel.SetSizer(vbox)
+        ################################################################
 
     def InitUI(self):
         self.SetUpPanel()
@@ -535,9 +618,12 @@ def main():
     parse_options()
     rdb.init_db()
     app = wx.App()
-    SetupRoundFrame(None, title='Disc Golf Database')
+    # start with the "Existing Rounds" window
+    ExamineRoundsFrame(None, title='DGDB: The Disc Golf Database')
+    #SetupRoundFrame(None, title='Disc Golf Database')
     app.MainLoop()
 
 
 if __name__ == '__main__':
     main()
+    sys.exit(0)

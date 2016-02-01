@@ -59,8 +59,8 @@ class Round:
     One round, not counting the individual scores
     '''
     def __init__(self, rnum, cnum, rdate):
-        self.num = rnum
-        self.course_num = cnum
+        self.num = int(rnum)
+        self.course_num = int(cnum)
         self.rdate = rdate
 
     def __str__(self):
@@ -71,7 +71,7 @@ class RoundDetail:
     '''
     One entry for one person for one round (which is one course on one day)
     '''
-    def __init__(self, rnum, pnum, fscore, bscore, acnt=0, ecnt=0):
+    def __init__(self, rnum, pnum, fscore, bscore, acnt=0, ecnt=0, score=0.0):
         self.round_num = rnum
         self.player_num = pnum
         self.front_score = fscore
@@ -80,7 +80,7 @@ class RoundDetail:
         self.eagle_cnt = ecnt
         self.overall = self.front_score + self.back_score
         # this is the CALCULATED *FLOATING POINT* score
-        self.score = 0
+        self.score = score
 
     def __eq__(self, other):
         return self.round_num == other.round_num and \
@@ -101,10 +101,12 @@ DB_DIR = 'db'
 DB_FILE = 'disc_golf.db'
 DB_PATH = "%s/%s" % (DB_DIR, DB_FILE)
 
+# our internal representation of a database, using dictionaries
 CourseList = {}
 PlayerList = {}
 RoundList = {}
-RoundDetailList = {}
+# the detail list is not indexed by a number, so it's an array
+RoundDetailList = []
 
 RoundNumberMax = 0
 
@@ -127,29 +129,35 @@ def init_db():
     dprint("Initializing Disc Golf Courses ...")
     for row in c.execute('''SELECT * FROM courses'''):
         course_num = row[0]
-        dprint("Adding course[%d]: %s" % (course_num, row[1]))
-        CourseList[course_num] = Course(course_num, row[1])
+        course_name = row[1]
+        dprint("Adding course[%d]: name=%s" % (course_num, course_name))
+        CourseList[course_num] = Course(course_num, course_name)
     for row in c.execute('''SELECT * FROM players'''):
-        player_num = row[0]
-        dprint("Adding player[%d]: %s (%s)" % (player_num, row[1], row[2]))
-        PlayerList[player_num] = Player(player_num, row[1], row[2])
+        (player_num, player_name, player_full_name) = row[0:3]
+        dprint("Adding player[%d]: name=%s full_name=%s" % (player_num,
+                                                            player_name,
+                                                            player_full_name))
+        PlayerList[player_num] = Player(player_num,
+                                        player_name,
+                                        player_full_name)
     for row in c.execute('''SELECT * FROM rounds'''):
-        round_num =row[0]
-        course_num = row[1]
-        dprint("Adding round[%d]: Course=%s, %s" % \
-               (round_num, course_num, row[2]))
-        RoundList[round_num] = Round(round_num, course_num, row[2])
+        (round_num, course_num, round_date) = row[0:3]
+        dprint("Adding round[%d]: course_num=%s, rnd_date=%s" % \
+               (round_num, course_num, round_date))
+        RoundList[round_num] = Round(round_num, course_num, round_date)
         if round_num > RoundNumberMax:
             RoundNumberMax = round_num
+    for row in c.execute('''SELECT * from round_details'''):
+        (round_num, player_num, fscore, bscore, acnt, ecnt, score) = row[0:7]
+        dprint("Adding round detail: rnd_num=%s, p_num=%s, frnt_score=%s, back_score=%s, a/e-cnt=%s/%s, score=%s" % \
+               (round_num, player_num, fscore, bscore, acnt, ecnt, score))
+        rd = RoundDetail(round_num, player_num, fscore, bscore,
+                         acnt, ecnt, score)
+        RoundDtailList.append(rd)
     dprint("Round Number max seen: %d" % RoundNumberMax)
-    # XXX round details? -- NOT YET IMPLEMENTED
 
 def next_round_num():
     global RoundNumberMax
 
     RoundNumberMax += 1
     return RoundNumberMax
-
-def create_new_round(course_num, round_date):
-    new_round = Round(new_round_num, course_num, round_date)
-    return new_round

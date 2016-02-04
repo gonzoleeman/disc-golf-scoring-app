@@ -65,7 +65,8 @@ rounds = [
     # 1. num -- autoincrement
     # 2. course_num (join from course.num)
     # 3. round_date
-    (2, "1/12/2015")	# Charlie's on Jan 12, 2015
+    (2, "1/12/2015"),	# Charlie's on Jan 12, 2015
+    (1, "1/19/2015"),	# Dick's on Jan 19, 2015
     ]
 
 round_details = [
@@ -77,11 +78,16 @@ round_details = [
     # acount
     # ecount
     # calc_score
-    (1, 3, 1, 0, 0, 0, 0),	# Dicks's on 1/12/2015, Charlie
-    (1, 2, 2, 0, 0, 0, 0),	# Dicks's on 1/12/2015, Pat
-    (1, 5, 3, 0, 0, 0, 0),	# Dicks's on 1/12/2015, Gabe
-    (1, 7, 4, 0, 0, 0, 0),	# Dicks's on 1/12/2015, John J
-    (1, 11, 0, 0, 0, 0, 0),	# Dicks's on 1/12/2015, Lee
+    (1, 3, 1, 0, 0, 0, 1.0),	# Dicks's on 1/12/2015, Charlie
+    (1, 2, 2, 0, 0, 0, 12.0),	# Dicks's on 1/12/2015, Pat
+    (1, 5, 3, 0, 0, 0, 5.0),	# Dicks's on 1/12/2015, Gabe
+    (1, 7, 4, 0, 0, 0, 0.5),	# Dicks's on 1/12/2015, John J
+    (1, 11, 0, 0, 0, 0, 2.3),	# Dicks's on 1/12/2015, Lee
+    (2, 3, 1, 0, 0, 0, 33.0),	# Charlie's on 1/19/2015, Charlie
+    (2, 9, 4, 0, 0, 0, 4.50),	# Charlie's on 1/19/2015, Jonathon
+    (2, 2, 2, 0, 0, 0, 0.25),	# Charlie's on 1/19/2015, Pat
+    (2, 5, 3, 0, 0, 0, 10.9),	# Charlie's on 1/19/2015, Gabe
+    (2, 11, 0, 0, 0, 0, 4.0),	# Charlie's on 1/19/2015, Lee
     ]
 
 

@@ -23,10 +23,12 @@ __version__ = "1.0"
 __author__ = "Lee Duncan"
 
 
+import sqlite3
+from dateutil.parser import parse as parse_date
+import datetime as dt
+
 from utils import dprint
 from opts import opts
-
-import sqlite3
 
 
 class Course:
@@ -61,7 +63,7 @@ class Round:
     def __init__(self, rnum, cnum, rdate):
         self.num = int(rnum)
         self.course_num = int(cnum)
-        self.rdate = rdate
+        self.rdate = parse_date(rdate)
 
     def __str__(self):
         return "Round[%d]: course=%d, %s" % \
@@ -138,6 +140,7 @@ def init_db():
         course_name = row[1]
         dprint("Adding course[%d]: name=%s" % (course_num, course_name))
         CourseList[course_num] = Course(course_num, course_name)
+    dprint("Initializing Disc Golf Players ...")
     for row in c.execute('''SELECT * FROM players'''):
         (player_num, player_name, player_full_name) = row[0:3]
         dprint("Adding player[%d]: name=%s full_name=%s" % (player_num,
@@ -146,6 +149,7 @@ def init_db():
         PlayerList[player_num] = Player(player_num,
                                         player_name,
                                         player_full_name)
+    dprint("Initializing Disc Golf Rounds ...")
     for row in c.execute('''SELECT * FROM rounds'''):
         (round_num, course_num, round_date) = row[0:3]
         dprint("Adding round[%d]: course_num=%s, rnd_date=%s" % \
@@ -153,6 +157,7 @@ def init_db():
         RoundList[round_num] = Round(round_num, course_num, round_date)
         if round_num > RoundNumberMax:
             RoundNumberMax = round_num
+    dprint("Initializing Disc Golf Round Details ...")
     for row in c.execute('''SELECT * from round_details'''):
         (round_num, player_num, fscore, bscore, acnt, ecnt, score) = row[0:7]
         dprint("Adding round detail: rnd_num=%s, p_num=%s, fscore=%s, bscore=%s, a/e-cnt=%s/%s, score=%s" % \

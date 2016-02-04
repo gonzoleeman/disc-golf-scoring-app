@@ -60,6 +60,7 @@ import sys
 from optparse import OptionParser
 import wx
 import re
+import datetime as dt
 
 import rdb
 from utils import dprint
@@ -101,15 +102,10 @@ class SetupRoundFrame(wx.Frame):
         vbox.AddSpacer(10)
         hbox2 = wx.BoxSizer(wx.HORIZONTAL)
         self.player_list = lc.AutoWidthCheckListCtrl(panel)
-        self.player_list.InsertColumn(0, 'Choose Players', width=100)
-        cnt = 0
-        for k in rdb.PlayerList.iterkeys():
-            p = rdb.PlayerList[k]
-            dprint("Setting up:", p)
-            self.player_list.InsertStringItem(cnt, p.name)
-            self.player_list.SetItemData(cnt, k)
-            dprint("Inserted %s in list, index=%d" % (p, cnt))
-            cnt += 1
+        player_data = {}
+        for k,v in rdb.PlayerList.iteritems():
+            player_data[k] = v.name
+        self.player_list.SetupList('Choose Players', player_data)
         hbox2.Add(self.player_list, 1, wx.EXPAND|wx.LEFT, border=10)
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.PlayerListSelected,
                   source=self.player_list,
@@ -117,14 +113,20 @@ class SetupRoundFrame(wx.Frame):
         ################################################################
         hbox2.AddSpacer(15)
         self.course_list = lc.AutoWidthListCtrl(panel)
-        self.course_list.InsertColumn(0, 'Choose a Course', width=100)
-        cnt = 0
-        for k in rdb.CourseList.iterkeys():
-            c = rdb.CourseList[k]
-            self.course_list.InsertStringItem(cnt, c.name)
-            self.course_list.SetItemData(cnt, k)
-            dprint("Inserted %s in list, index=%d" % (c, cnt))
-            cnt += 1
+        #self.course_list.InsertColumn(0, 'Choose a Course', width=100)
+        self.course_list.SetupListHdr(['Choose a Course'],
+                                      [wx.LIST_FORMAT_LEFT])
+        item_data = {}
+        for k, c in rdb.CourseList.iteritems():
+            item_data[k] = (c.name,)
+        self.course_list.SetupListItems(item_data)
+        #cnt = 0
+        #for k in rdb.CourseList.iterkeys():
+        #    c = rdb.CourseList[k]
+        #    self.course_list.InsertStringItem(cnt, c.name)
+        #    self.course_list.SetItemData(cnt, k)
+        #    dprint("Inserted %s in list, index=%d" % (c, cnt))
+        #    cnt += 1
         hbox2.Add(self.course_list, 1, wx.EXPAND|wx.RIGHT, border=10)
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.CourseListSelected,
                   source=self.course_list,
@@ -180,10 +182,15 @@ class SetupRoundFrame(wx.Frame):
         i = self.course_list.GetFirstSelected()
         cnum = self.course_list.GetItemData(i)
         dprint("Course number: %d" % cnum)
-        rdate = self.round_date.GetValue()
+        wx_rdate = self.round_date.GetValue()
+        rdate = dt.datetime(wx_rdate.GetYear(),
+                            wx_rdate.GetMonth(),
+                            wx_rdate.GetDay())
         dprint("round date:", rdate)
         ################################################################
-        this_round = rdb.Round(rdb.next_round_num(), cnum, rdate)
+        this_round = rdb.Round(rdb.next_round_num(), cnum,
+                               rdate.strftime("%m/%d/%Y"))
+        dprint("Created:", this_round)
         round_details = []
         for (k, v) in self.player_list.items_checked.iteritems():
             i = self.player_list.GetItemData(k)
@@ -196,10 +203,9 @@ class SetupRoundFrame(wx.Frame):
             dprint("Created Round Detail:", rd)
         round_details = sorted(round_details, key=lambda rd: rd.player_num)
         ################################################################
-        # popup a window to enter the scores for round
-        srf = ScoreRoundFrame(self.GetParent(), title='Score a Round')
-        srf.MyCreate(cnum, rdate, this_round, round_details)
-        #self.Show(False)
+        # popup a window to enter the scores for round then go away
+        srf = RoundScoreFrame(self.GetParent(), title='Score a Round')
+        srf.MyCreate(this_round, round_details)
         self.Destroy()
 
     def OnQuit(self, e):
@@ -213,22 +219,25 @@ class SetupRoundFrame(wx.Frame):
         dprint("GUI Initialized")
 
 
-class ScoreRoundFrame(wx.Frame):
+class RoundScoreFrame(wx.Frame):
     '''
     For Creating an entry for a new Round
     '''
     def __init__(self, *args, **kwargs):
-        super(ScoreRoundFrame, self).__init__(*args, **kwargs)
+        super(RoundScoreFrame, self).__init__(*args, **kwargs)
         self.SetSize(wx.Size(500, 300))
 
-    def MyCreate(self, cnum, rdate, this_round, round_details):
-        self.cnum = cnum
-        self.rdate = rdate
-        dprint("Course number: %d, round date: %s" % (cnum, rdate))
-        #self.pnum_list = pnum_list
-        #dprint("Player numbers:", pnum_list)
+    def MyCreate(self, this_round, round_details, for_update=False):
+        self.cnum = this_round.course_num
+        self.rdate = this_round.rdate
+        self.for_update = for_update
+        dprint("Score Create: Course[%d], round date: %s" % \
+               (self.cnum, self.rdate))
         self.this_round = this_round
         self.round_details = round_details
+        dprint("Added round details:")
+        for rd in round_details:
+            dprint(rd)
         self.InitUI()
 
     def SetUpPanel(self):
@@ -255,7 +264,7 @@ class ScoreRoundFrame(wx.Frame):
         bold_font.SetWeight(wx.FONTWEIGHT_BOLD)
         st2 = wx.StaticText(panel, label='Round Date: ')
         st2.SetFont(bold_font)
-        st3 = wx.StaticText(panel, label=self.rdate.Format('%m/%d/%Y'))
+        st3 = wx.StaticText(panel, label=self.rdate.strftime('%m/%d/%Y'))
         st4 = wx.StaticText(panel, label='Location: ')
         st4.SetFont(bold_font)
         st5 = wx.StaticText(panel, label=rdb.CourseList[self.cnum].name)
@@ -271,7 +280,13 @@ class ScoreRoundFrame(wx.Frame):
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
         self.score_list = lc.AutoWidthListEditCtrl(panel)
         self.score_list.SetupListHdr(['Name', 'Front 9', 'Back 9',
-                                      'Aces', 'Eagles', 'Score'])
+                                      'Aces', 'Eagles', 'Score'],
+                                     [wx.LIST_FORMAT_LEFT,
+                                      wx.LIST_FORMAT_CENTER,
+                                      wx.LIST_FORMAT_CENTER,
+                                      wx.LIST_FORMAT_CENTER,
+                                      wx.LIST_FORMAT_CENTER,
+                                      wx.LIST_FORMAT_RIGHT])
         item_data = self.RoundDetailsAsDict()
         self.score_list.SetupListItems(item_data)
         hbox3.Add(self.score_list, 1, wx.EXPAND|wx.ALL, border=10)
@@ -286,7 +301,7 @@ class ScoreRoundFrame(wx.Frame):
         self.commit_button.Disable()
         self.calc_button = wx.Button(panel, id=wx.ID_SETUP,
                                           label='Calculate')
-        self.calc_button.Disable()
+        #self.calc_button.Disable()
         self.Bind(wx.EVT_BUTTON, self.Cancel, source=cancel_button)
         self.Bind(wx.EVT_BUTTON, self.Commit, source=self.commit_button)
         self.Bind(wx.EVT_BUTTON, self.Calculate, source=self.calc_button)
@@ -307,15 +322,25 @@ class ScoreRoundFrame(wx.Frame):
         dprint("Commit DB: NOT YET IMPLEMENTED")
 
     def RoundDetailsAsDict(self):
+        dprint("Making Round Details into dictionary ...")
         item_data = {}
         for rd in self.round_details:
+            dprint("Round Detail:", rd)
             player = rdb.PlayerList[rd.player_num]
-            item_data[rd.player_num] = (player.name,
-                                        str(rd.fscore),
-                                        str(rd.bscore),
-                                        str(rd.acnt),
-                                        str(rd.ecnt),
-                                        str(rd.score))
+            if False:
+                item_data[rd.player_num] = (player.name,
+                                            str(rd.fscore),
+                                            str(rd.bscore),
+                                            str(rd.acnt),
+                                            str(rd.ecnt),
+                                            str(rd.score))
+            else:
+                item_data[rd.player_num] = (player.name,
+                                            rd.fscore,
+                                            rd.bscore,
+                                            rd.acnt,
+                                            rd.ecnt,
+                                            rd.score)
         return item_data
 
     def Calculate(self, e):
@@ -356,7 +381,7 @@ class ScoreRoundFrame(wx.Frame):
         self.round_details = scored_details
         item_data = self.RoundDetailsAsDict()
         self.score_list.SetupListItems(item_data)
-        self.calc_button.Disable()
+        #self.calc_button.Disable()
         self.commit_button.Enable()
 
     def Cancel(self, e):
@@ -365,7 +390,7 @@ class ScoreRoundFrame(wx.Frame):
 
     def ListEditedEvent(self, evt):
         dprint("Our List has been Edited!!!")
-        self.calc_button.Enable()
+        #self.calc_button.Enable()
         self.commit_button.Disable()
 
     def InitUI(self):
@@ -376,7 +401,7 @@ class ScoreRoundFrame(wx.Frame):
 class RoundsFrame(wx.Frame):
     def __init__(self, *args, **kwargs):
         super(RoundsFrame, self).__init__(*args, **kwargs)
-        self.SetSize(wx.Size(500, 300))
+        self.SetSize(wx.Size(300, 300))
         self.InitUI()
 
     def SetRounds(self, rnd_list):
@@ -403,18 +428,23 @@ class RoundsFrame(wx.Frame):
         vbox.AddSpacer(10)
         hbox2 = wx.BoxSizer(wx.HORIZONTAL)
         self.round_list = lc.AutoWidthListCtrl(panel)
-        self.round_list.SetupListHdr(['Date', 'Course', 'Players'])
+        self.round_list.SetupListHdr(['Date', 'Course', 'Players'],
+                                     [wx.LIST_FORMAT_LEFT,
+                                      wx.LIST_FORMAT_LEFT,
+                                      wx.LIST_FORMAT_LEFT])
         item_data = {}
-        for c in rdb.RoundList.iterkeys():
-            rnd = rdb.RoundList[c]
+        for c, rnd in rdb.RoundList.iteritems():
             course_name = rdb.CourseList[rnd.course_num].name
             dprint("Searching for players for round number: %d" % rnd.num)
             player_cnt = 0
-            for round_detail in rdb.RoundDetailList:
-                dprint("Looking for round %d in:" % rnd.num, round_detail)
-                if round_detail.round_num == rnd.num:
+            for rd in rdb.RoundDetailList:
+                dprint("Looking for round %d in:" % rnd.num, rd)
+                if rd.round_num == rnd.num:
                     player_cnt += 1
-            item_data[c] = (rnd.rdate, course_name, str(player_cnt))
+            # items must be strings for the GUI
+            item_data[c] = (rnd.rdate.strftime("%m/%d/%Y") ,
+                            course_name,
+                            str(player_cnt))
         self.SetRounds(item_data)
         hbox2.Add(self.round_list, 1, wx.EXPAND|wx.ALL, border=10)
         vbox.Add(hbox2, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
@@ -424,16 +454,16 @@ class RoundsFrame(wx.Frame):
                   source=self.round_list, id=wx.ID_ANY)
         ################################################################
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
-        self.quit_button = wx.Button(panel, id=wx.ID_EXIT, label='Quit')
+        #self.quit_button = wx.Button(panel, id=wx.ID_EXIT, label='Quit')
         self.show_button = wx.Button(panel, id=wx.ID_EDIT, label='Show Round')
         self.new_button = wx.Button(panel, id=wx.ID_NEW, label='New Round')
         self.show_button.Disable()
         self.Bind(wx.EVT_BUTTON, self.OnNewRound, source=self.new_button)
-        self.Bind(wx.EVT_BUTTON, self.OnQuit, source=self.quit_button)
+        #self.Bind(wx.EVT_BUTTON, self.OnQuit, source=self.quit_button)
         self.Bind(wx.EVT_BUTTON, self.OnShow, source=self.show_button)
         hbox3.AddSpacer(10)
-        hbox3.Add(self.quit_button)
-        hbox3.AddStretchSpacer(1)
+        #hbox3.Add(self.quit_button)
+        #hbox3.AddStretchSpacer(1)
         hbox3.Add(self.show_button)
         hbox3.AddStretchSpacer(1)
         hbox3.Add(self.new_button)
@@ -452,13 +482,22 @@ class RoundsFrame(wx.Frame):
         self.show_button.Disable()
 
     def OnNewRound(self, e):
-        dprint("New Round!")
+        dprint("*** New Round!")
         SetupRoundFrame(self, title='Setup a New Round')
 
     def OnShow(self, e):
-        dprint("Show an existing round: NOT YET IMPLEMENTED")
-        # XXX get list of player numbers in this round
-        pass
+        '''show an existing round'''
+        dprint("*** Show an existing round")
+        idx = self.round_list.GetFirstSelected()
+        key = self.round_list.GetItemData(idx)
+        rnd = rdb.RoundList[key]
+        round_details = []
+        for rd in rdb.RoundDetailList:
+            dprint("looking for round %d in:" % rnd.num, rd)
+            if rnd.num == rd.round_num:
+                round_details.append(rd)
+        srf = RoundScoreFrame(self, title='Examine a Round')
+        srf.MyCreate(rnd, round_details)
 
     def SetUpMenuBar(self):
         # create the 'File' menu and fill it in

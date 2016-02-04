@@ -21,16 +21,16 @@ def score_round(round_list):
     dprint("score_round: *** ENTERING ***")
 
     # get sorted round lists
-    front_list = sorted(round_list, key=lambda rdetail: rdetail.front_score)
-    front_score_list = sorted([rnd.front_score for rnd in front_list])
+    front_list = sorted(round_list, key=lambda rd: rd.fscore)
+    front_score_list = sorted([rnd.fscore for rnd in front_list])
     front_score_results = calculate_score(front_score_list, ROUND_SCORES)
     # fill in front_list with front-9 totals
-    back_list = sorted(round_list, key=lambda rdetail: rdetail.back_score)
-    back_score_list = sorted([rnd.back_score for rnd in back_list])
+    back_list = sorted(round_list, key=lambda rd: rd.bscore)
+    back_score_list = sorted([rnd.bscore for rnd in back_list])
     back_score_results = calculate_score(back_score_list, ROUND_SCORES)
     # fill in back_list with back-9 totals
-    ttl_list = sorted(round_list, key=lambda rdetail: rdetail.overall)
-    ttl_score_list = sorted([rnd.overall for rnd in ttl_list])
+    ttl_list = sorted(round_list, key=lambda rd: rd.Overall())
+    ttl_score_list = sorted([rnd.Overall() for rnd in ttl_list])
     ttl_score_results = calculate_score(ttl_score_list, OVERALL_SCORES)
     # fill in ttl_list with overall totals
 

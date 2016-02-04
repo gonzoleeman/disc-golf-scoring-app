@@ -71,31 +71,36 @@ class RoundDetail:
     '''
     One entry for one person for one round (which is one course on one day)
     '''
-    def __init__(self, rnum, pnum, fscore, bscore, acnt=0, ecnt=0, score=0.0):
-        self.round_num = rnum
-        self.player_num = pnum
-        self.front_score = fscore
-        self.back_score = bscore
-        self.ace_cnt = acnt
-        self.eagle_cnt = ecnt
-        self.overall = self.front_score + self.back_score
+    def __init__(self, rnum, pnum, fscore=None, bscore=None,
+                 acnt=0, ecnt=0, score=0.0):
+        self.round_num = int(rnum)
+        self.player_num = int(pnum)
+        self.fscore = (None if fscore is None else int(fscore))
+        self.bscore = bscore
+        if self.bscore is not None:
+            self.bscore = int(self.bscore)
+        self.acnt = acnt
+        self.ecnt = ecnt
         # this is the CALCULATED *FLOATING POINT* score
-        self.score = score
+        self.score = float(score)
 
     def __eq__(self, other):
         return self.round_num == other.round_num and \
                self.player_num == other.player_num
 
     def SetScore(self, fscore, bscore):
-        self.front_score = fscore
-        self.back_score = bscore
-        self.overall = self.front_score + self.back_score
+        self.fscore = int(fscore)
+        self.bscore = int(bscore)
+
+    def Overall(self):
+        '''Return overall, assuming round has been scored'''
+        return self.fscore + self.bscore
 
     def __str__(self):
         return "RoundDetail[round=%d]: " % self.round_num + \
-               "pnum=%d, score=%d/%d->%d, a/e=%d/%d => %f" % \
-               (self.player_num, self.front_score, self.back_score,
-                self.overall, self.ace_cnt, self.eagle_cnt, self.score)
+               "pnum=%d, score=%s/%s, a/e=%d/%d => %f" % \
+               (self.player_num, self.fscore, self.bscore,
+                self.acnt, self.ecnt, self.score)
 
 
 DB_DIR = 'db'
@@ -150,7 +155,7 @@ def init_db():
             RoundNumberMax = round_num
     for row in c.execute('''SELECT * from round_details'''):
         (round_num, player_num, fscore, bscore, acnt, ecnt, score) = row[0:7]
-        dprint("Adding round detail: rnd_num=%s, p_num=%s, frnt_score=%s, back_score=%s, a/e-cnt=%s/%s, score=%s" % \
+        dprint("Adding round detail: rnd_num=%s, p_num=%s, fscore=%s, bscore=%s, a/e-cnt=%s/%s, score=%s" % \
                (round_num, player_num, fscore, bscore, acnt, ecnt, score))
         rd = RoundDetail(round_num, player_num, fscore, bscore,
                          acnt, ecnt, score)

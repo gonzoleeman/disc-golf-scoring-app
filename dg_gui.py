@@ -173,28 +173,34 @@ class SetupRoundFrame(wx.Frame):
         self.SetScoreButtonState()
 
     def OnScoreARound(self, e):
-        dprint("Button Pressed: %d players selected:" % \
+        dprint("*** 'Score' Button Pressed: players selected=%d:" % \
                self.player_list.item_check_count,
                self.player_list.items_checked)
-        player_numbers = []
-        for (k, v) in self.player_list.items_checked.iteritems():
-            i = self.player_list.GetItemData(k)
-            if v:
-                player_numbers.append(i)
-        dprint("Player number list:", player_numbers)
-        player_numbers = sorted(player_numbers)
-        dprint("Sorted Player number list:", player_numbers)
+        ################################################################
         i = self.course_list.GetFirstSelected()
-        course_number = self.course_list.GetItemData(i)
-        dprint("Course number: %d" % course_number)
+        cnum = self.course_list.GetItemData(i)
+        dprint("Course number: %d" % cnum)
         rdate = self.round_date.GetValue()
         dprint("round date:", rdate)
-        self.ScoreRound(course_number, rdate, player_numbers)
-
-    def ScoreRound(self, course_number, rdate, player_numbers):
-        '''popup a window to enter the scores for round'''
-        srf = ScoreRoundFrame(self, title='Score a Round')
-        srf.Create(course_number, rdate, player_numbers)
+        ################################################################
+        this_round = rdb.Round(rdb.next_round_num(), cnum, rdate)
+        round_details = []
+        for (k, v) in self.player_list.items_checked.iteritems():
+            i = self.player_list.GetItemData(k)
+            if not v:
+                continue # this user not checked
+            player = rdb.PlayerList[i]
+            dprint("Found player[%d] (from checklist):" % i, player)
+            rd = rdb.RoundDetail(this_round.num, player.num)
+            round_details.append(rd)
+            dprint("Created Round Detail:", rd)
+        round_details = sorted(round_details, key=lambda rd: rd.player_num)
+        ################################################################
+        # popup a window to enter the scores for round
+        srf = ScoreRoundFrame(self.GetParent(), title='Score a Round')
+        srf.MyCreate(cnum, rdate, this_round, round_details)
+        #self.Show(False)
+        self.Destroy()
 
     def OnQuit(self, e):
         # XXX Need to check for database modified here, with a popup?
@@ -213,20 +219,16 @@ class ScoreRoundFrame(wx.Frame):
     '''
     def __init__(self, *args, **kwargs):
         super(ScoreRoundFrame, self).__init__(*args, **kwargs)
-
-    def Create(self, cnum, rdate, pnum_list):
         self.SetSize(wx.Size(500, 300))
+
+    def MyCreate(self, cnum, rdate, this_round, round_details):
         self.cnum = cnum
         self.rdate = rdate
-        self.pnum_list = pnum_list
         dprint("Course number: %d, round date: %s" % (cnum, rdate))
-        dprint("Player numbers:", pnum_list)
-        self.this_round = rdb.Round(rdb.next_round_num(), cnum, rdate)
-        self.round_details = []
-        for c in self.pnum_list:
-            player = rdb.PlayerList[c]
-            rnd = rdb.RoundDetail(self.this_round.num, player.num, 0, 0)
-            self.round_details.append(rnd)
+        #self.pnum_list = pnum_list
+        #dprint("Player numbers:", pnum_list)
+        self.this_round = this_round
+        self.round_details = round_details
         self.InitUI()
 
     def SetUpPanel(self):
@@ -270,12 +272,6 @@ class ScoreRoundFrame(wx.Frame):
         self.score_list = lc.AutoWidthListEditCtrl(panel)
         self.score_list.SetupListHdr(['Name', 'Front 9', 'Back 9',
                                       'Aces', 'Eagles', 'Score'])
-        item_data = {}
-        for c in self.pnum_list:
-            player = rdb.PlayerList[c]
-            rnd = rdb.RoundDetail(self.this_round.num, player.num, 0, 0)
-            self.round_details.append(rnd)
-            item_data[player.num] = (player.name, "None", "None", "0", "0", "0")
         item_data = self.RoundDetailsAsDict()
         self.score_list.SetupListItems(item_data)
         hbox3.Add(self.score_list, 1, wx.EXPAND|wx.ALL, border=10)
@@ -315,10 +311,10 @@ class ScoreRoundFrame(wx.Frame):
         for rd in self.round_details:
             player = rdb.PlayerList[rd.player_num]
             item_data[rd.player_num] = (player.name,
-                                        str(rd.front_score),
-                                        str(rd.back_score),
-                                        str(rd.ace_cnt),
-                                        str(rd.eagle_cnt),
+                                        str(rd.fscore),
+                                        str(rd.bscore),
+                                        str(rd.acnt),
+                                        str(rd.ecnt),
                                         str(rd.score))
         return item_data
 

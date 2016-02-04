@@ -153,7 +153,7 @@ def init_db():
                (round_num, player_num, fscore, bscore, acnt, ecnt, score))
         rd = RoundDetail(round_num, player_num, fscore, bscore,
                          acnt, ecnt, score)
-        RoundDtailList.append(rd)
+        RoundDetailList.append(rd)
     dprint("Round Number max seen: %d" % RoundNumberMax)
 
 def next_round_num():

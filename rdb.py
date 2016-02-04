@@ -92,10 +92,11 @@ class RoundDetail:
         self.overall = self.front_score + self.back_score
 
     def __str__(self):
-        return "RoundDetail[round=%d]: pnum=%d, score=%d/%d->%d, a/e=%d/%d => %f" % \
-               (self.round_num, self.player_num,
-                self.front_score, self.back_score, self.overall,
-                self.ace_cnt, self.eagle_cnt, self.score)
+        return "RoundDetail[round=%d]: " % self.round_num + \
+               "pnum=%d, score=%d/%d->%d, a/e=%d/%d => %f" % \
+               (self.player_num, self.front_score, self.back_score,
+                self.overall, self.ace_cnt, self.eagle_cnt, self.score)
+
 
 DB_DIR = 'db'
 DB_FILE = 'disc_golf.db'

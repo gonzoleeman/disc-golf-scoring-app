@@ -223,6 +223,10 @@ class ScoreRoundFrame(wx.Frame):
         dprint("Player numbers:", pnum_list)
         self.this_round = rdb.Round(rdb.next_round_num(), cnum, rdate)
         self.round_details = []
+        for c in self.pnum_list:
+            player = rdb.PlayerList[c]
+            rnd = rdb.RoundDetail(self.this_round.num, player.num, 0, 0)
+            self.round_details.append(rnd)
         self.InitUI()
 
     def SetUpPanel(self):
@@ -269,9 +273,10 @@ class ScoreRoundFrame(wx.Frame):
         item_data = {}
         for c in self.pnum_list:
             player = rdb.PlayerList[c]
-            round = rdb.RoundDetail(self.this_round.num, player.num, 0, 0)
-            self.round_details.append(round)
+            rnd = rdb.RoundDetail(self.this_round.num, player.num, 0, 0)
+            self.round_details.append(rnd)
             item_data[player.num] = (player.name, "None", "None", "0", "0", "0")
+        item_data = self.RoundDetailsAsDict()
         self.score_list.SetupListItems(item_data)
         hbox3.Add(self.score_list, 1, wx.EXPAND|wx.ALL, border=10)
         vbox.Add(hbox3, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
@@ -304,6 +309,18 @@ class ScoreRoundFrame(wx.Frame):
 
     def Commit(self, e):
         dprint("Commit DB: NOT YET IMPLEMENTED")
+
+    def RoundDetailsAsDict(self):
+        item_data = {}
+        for rd in self.round_details:
+            player = rdb.PlayerList[rd.player_num]
+            item_data[rd.player_num] = (player.name,
+                                        str(rd.front_score),
+                                        str(rd.back_score),
+                                        str(rd.ace_cnt),
+                                        str(rd.eagle_cnt),
+                                        str(rd.score))
+        return item_data
 
     def Calculate(self, e):
         # get data from list into
@@ -341,15 +358,7 @@ class ScoreRoundFrame(wx.Frame):
         for d in scored_details:
             dprint("Score Details Calculated:", d)
         self.round_details = scored_details
-        item_data = {}
-        for rnd in self.round_details:
-            player = rdb.PlayerList[rnd.player_num]
-            item_data[rnd.player_num] = (player.name,
-                                        str(rnd.front_score),
-                                        str(rnd.back_score),
-                                        str(rnd.ace_cnt),
-                                        str(rnd.eagle_cnt),
-                                        str(rnd.score))
+        item_data = self.RoundDetailsAsDict()
         self.score_list.SetupListItems(item_data)
         self.calc_button.Disable()
         self.commit_button.Enable()

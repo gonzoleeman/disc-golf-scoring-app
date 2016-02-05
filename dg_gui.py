@@ -345,8 +345,8 @@ class RoundScoreFrame(wx.Frame):
             return # XXX for now
         else:
             rdb.add_round(self.this_round, self.round_details)
-            rdb.commit_db()
-            dprint("Updating parent ...")
+        rdb.commit_db()
+        dprint("Updating parent ...")
         pub.sendMessage("ROUND UPDATE", self.this_round)
         self.is_edited = False
         self.Close()

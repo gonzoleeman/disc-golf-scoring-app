@@ -4,7 +4,7 @@ Python script to present a Disc Golf GUI, that allows
 us to keep track of courses and holes on that course
 
 TO DO:
-    - implement updating the database
+    - implement updating/saving the database
 
     - fix floating point formatting for the "Score" column
       of the Round Scoring frame
@@ -14,22 +14,17 @@ TO DO:
     - make setup window become the scoring window for a round,
       instead of just replacing one window with the next
 
-    - "are you sure" popup if exit with database modified
-
-    - implement "About" popup
-
     - for scoring window:
       - implement "commit"
-      - ask "are you sure" when cancel is choose on modified DB
-      - update to handle round updates, e.g. "Commit" might
-        become "Add/Update", depending on the purpose of the window
+
+    - display results, e.g. year-to-date, custom-range?
+      (and what about a graph? woo hoo!)
 
     -------------------------------
 
-    - support DB modification for Courses and Players (some day)
+    - Support alternate/new Database files (why?)
 
-    - implement saving the database
-    - implement opening a new database
+    - support DB modification for Courses and Players (some day)
 
     - Properly package for distribution
 
@@ -57,6 +52,7 @@ History:
     version 1.6: now scoring but not saving to the database
         i.e. "Commit" not yet implemented
     version 1.7: add starting "round list" window
+    versoin 1.8: all works but commit?
 '''
 
 
@@ -75,7 +71,7 @@ import listctrl as lc
 
 
 __author__ = "Lee Duncan"
-__version__ = "1.6"
+__version__ = "1.8"
 
 
 class SetupRoundFrame(wx.Frame):
@@ -234,6 +230,7 @@ class RoundScoreFrame(wx.Frame):
     def __init__(self, *args, **kwargs):
         super(RoundScoreFrame, self).__init__(*args, **kwargs)
         self.SetSize(wx.Size(500, 300))
+        self.is_edited = False
 
     def MyCreate(self, this_round, round_details, for_update=False):
         self.cnum = this_round.course_num
@@ -396,15 +393,24 @@ class RoundScoreFrame(wx.Frame):
         self.score_list.SetupListItems(item_data)
         #self.calc_button.Disable()
         self.commit_button.Enable()
+        self.is_edited = True
 
     def Cancel(self, e):
-        dprint("Cancel!")
+        dprint("Cancel!: Edited=%s" % self.is_edited)
+        if self.is_edited:
+            res = wx.MessageBox('Data Modified. Are you sure?',
+                                'Question',
+                                wx.YES_NO | wx.ICON_WARNING)
+            dprint("Message result:", res)
+            if res == wx.NO:
+                return
         self.Close()
 
     def ListEditedEvent(self, evt):
         dprint("Our List has been Edited!!!")
         #self.calc_button.Enable()
         self.commit_button.Disable()
+        self.is_edited = True
 
     def InitUI(self):
         self.SetUpPanel()
@@ -553,7 +559,42 @@ class RoundsFrame(wx.Frame):
         self.Destroy()
 
     def OnAbout(self, e):
-        dprint('About ... NOT YET IMPLEMENTED')
+
+        description = """Disc Golf Score Manager manages and scores Disc
+Golf rounds. It contains a list of Players and a list of Courses
+and it allows users to edit existing rounds or create new ones.
+It will also soon support displaying results, dude! New versions
+may very well solve the P-vs-NP problem, if we're lucky!"""
+        
+        licence = """Disc Golf Score Manager is free software;
+you can redistribute it and/or modify it under the terms of the
+GNU General Public License as published by the Free Software
+Foundation; either version 2 of the License, or (at your option)
+any later version.
+
+Disc Golf Score Manager is distributed in the hope that it will be useful, 
+but WITHOUT ANY WARRANTY; without even the implied warranty of 
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+See the GNU General Public License for more details. You should have 
+received a copy of the GNU General Public License along with File Hunter; 
+if not, write to the Free Software Foundation, Inc., 59 Temple Place, 
+Suite 330, Boston, MA  02111-1307  USA"""
+
+        info = wx.AboutDialogInfo()
+
+        info.SetIcon(wx.Icon('AboutIcon.png', wx.BITMAP_TYPE_PNG))
+        info.SetName('Disc Golf Score Manager')
+        info.SetVersion(__version__)
+        info.SetDescription(description)
+        info.SetCopyright('(C) 2016 Lee Duncan')
+        info.SetWebSite('http://www.gonzoleeman.net')
+        info.SetLicence(licence)
+        info.AddDeveloper('Lee Duncan')
+        info.AddDocWriter('Lee Duncan')
+        info.AddArtist('Natty')
+        info.AddArtist('DD')
+        info.AddTranslator('Cyndi Duncan')
+        wx.AboutBox(info)
 
     def InitUI(self):
         self.SetUpMenuBar()

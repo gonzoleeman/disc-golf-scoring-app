@@ -77,10 +77,8 @@ class RoundDetail:
                  acnt=0, ecnt=0, score=0.0):
         self.round_num = int(rnum)
         self.player_num = int(pnum)
-        self.fscore = (None if fscore is None else int(fscore))
-        self.bscore = bscore
-        if self.bscore is not None:
-            self.bscore = int(self.bscore)
+        self.fscore = None if fscore is None else int(fscore)
+        self.bscore = None if fscore is None else int(fscore)
         self.acnt = acnt
         self.ecnt = ecnt
         # this is the CALCULATED *FLOATING POINT* score
@@ -115,33 +113,43 @@ PlayerList = {}
 RoundList = {}
 # the detail list is not indexed by a number, so it's an array
 RoundDetailList = []
-
 RoundNumberMax = 0
 
-#
-# database routines (use a 'class'?)
-#
-def init_db():
-    '''Initialize the DG Database'''
+DBConn = None
+DBc = None
 
+
+#
+# database routines
+#
+
+def db_cmd_exec(cmd):
+    global DBc
+
+    dprint("sqlite3 cmd: %s" % cmd)
+    return DBc.execute(cmd)
+
+
+def init_courses():
+    global DBc
     global CourseList
-    global PlayerList
-    global RoundList
-    global RoundDetailList
-    global RoundNumberMax
-
-    dprint("Initializing the Database (%s) ..." % DB_PATH)
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    # now read our DB tables into Python objects
+    
     dprint("Initializing Disc Golf Courses ...")
-    for row in c.execute('''SELECT * FROM courses'''):
+    CourseList = {}
+    for row in db_cmd_exec('SELECT * FROM courses'):
         course_num = row[0]
         course_name = row[1]
         dprint("Adding course[%d]: name=%s" % (course_num, course_name))
         CourseList[course_num] = Course(course_num, course_name)
+
+
+def init_players():
+    global DBc
+    global PlayerList
+
     dprint("Initializing Disc Golf Players ...")
-    for row in c.execute('''SELECT * FROM players'''):
+    PlayerList = {}
+    for row in db_cmd_exec('SELECT * FROM players'):
         (player_num, player_name, player_full_name) = row[0:3]
         dprint("Adding player[%d]: name=%s full_name=%s" % (player_num,
                                                             player_name,
@@ -149,8 +157,18 @@ def init_db():
         PlayerList[player_num] = Player(player_num,
                                         player_name,
                                         player_full_name)
+
+
+def init_rounds():
+    global DBc
+    global RoundList
+    global RoundDetailList
+    global RoundNumberMax
+
     dprint("Initializing Disc Golf Rounds ...")
-    for row in c.execute('''SELECT * FROM rounds'''):
+    RoundList = {}
+    RoundNumberMax = 0
+    for row in db_cmd_exec('SELECT * FROM rounds'):
         (round_num, course_num, round_date) = row[0:3]
         dprint("Adding round[%d]: course_num=%s, rnd_date=%s" % \
                (round_num, course_num, round_date))
@@ -158,17 +176,67 @@ def init_db():
         if round_num > RoundNumberMax:
             RoundNumberMax = round_num
     dprint("Initializing Disc Golf Round Details ...")
-    for row in c.execute('''SELECT * from round_details'''):
+    RoundDetailList = []
+    for row in db_cmd_exec('SELECT * from round_details'):
         (round_num, player_num, fscore, bscore, acnt, ecnt, score) = row[0:7]
-        dprint("Adding round detail: rnd_num=%s, p_num=%s, fscore=%s, bscore=%s, a/e-cnt=%s/%s, score=%s" % \
-               (round_num, player_num, fscore, bscore, acnt, ecnt, score))
+        dprint("Adding round detail: " +
+               "rnd_num=%s, p_num=%s, " % (fscore, bscore) +
+               "fscore=%s, bscore=%s, " % (round_num, player_num) +
+               "a/e-cnt=%s/%s, score=%s" % (acnt, ecnt, score))
         rd = RoundDetail(round_num, player_num, fscore, bscore,
                          acnt, ecnt, score)
         RoundDetailList.append(rd)
     dprint("Round Number max seen: %d" % RoundNumberMax)
+
+
+def init_db():
+    '''Initialize the DG Database'''
+
+    global DBConn
+    global DBc
+
+    dprint("Initializing the Database (%s) ..." % DB_PATH)
+    DBConn = sqlite3.connect(DB_PATH)
+    DBc = DBConn.cursor()
+    # now read our DB tables into Python objects
+    init_courses()
+    init_players()
+    init_rounds()
+
+
+def commit_db():
+    '''Commit the Database'''
+    dprint("Commiting the database ...")
+    DBConn.commit()
+
 
 def next_round_num():
     global RoundNumberMax
 
     RoundNumberMax += 1
     return RoundNumberMax
+
+
+def add_round(rnd, rd_list):
+    '''Add the specified round and list of round details to the DB'''
+    dprint("Adding to DB:", rnd)
+    dprint("And rounds:")
+    for rd in rd_list:
+        dprint(rd)
+    dprint("NOT YET IMPLEMENTED")
+    cmd = ('''INSERT INTO rounds(course_num, round_date)
+              VALUES(%d,"%s")''' % (rnd.num, rnd.rdate.strftime("%m/%d/%Y")))
+    dprint("DB Cmd: %s" % cmd)
+    db_cmd_exec(cmd)
+    for rd in rd_list:
+        cmd = ("INSERT INTO round_details " + \
+                    "VALUES(%d,%d,%d,%d,%d,%d,%f)" % \
+                    (rd.round_num, rd.player_num, rd.fscore, rd.bscore,
+                     rd.acnt, rd.ecnt, rd.score))
+        dprint("DB Cmd: %s" % cmd)
+        db_cmd_exec(cmd)
+
+
+def modify_round(rnd, rd_list):
+    '''Modify the specified round and list of round details in the DB'''
+    dprint("NOT YET IMPLEMENTED")

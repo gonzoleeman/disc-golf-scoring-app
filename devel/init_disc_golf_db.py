@@ -24,6 +24,7 @@ _DB_FILE = 'disc_golf.db'
 __author__ = "Lee Duncan"
 __version__ = "1.0"
 
+
 #
 # data for preloading the database
 #
@@ -43,6 +44,7 @@ players = [
     ("Jonathon", "Jonathon Williams"),
     ("Rick", "Rick Miller"),
     ("Lee", "Lee Duncan"),
+    ("Bill", "Bill ???"),
     ]
 
 courses = [
@@ -138,14 +140,13 @@ def initialize_rounds(c):
                                 ecount SMALLINT,
                                 calc_score DOUBLE,
                                 PRIMARY KEY (round_num, player_num))''')
-    if opts.debug:
-        dprint("Initializing DB Table: 'rounds' ...")
-        c.executemany(
-            '''INSERT INTO rounds(course_num, round_date) VALUES (?,?)''',
-            rounds)
-        dprint("Initializing DB Table: 'round_details' ...")
-        c.executemany('''INSERT INTO round_details VALUES (?,?,?,?,?,?,?)''',
-                      round_details)
+    dprint("Initializing DB Table: 'rounds' ...")
+    c.executemany(
+        '''INSERT INTO rounds(course_num, round_date) VALUES (?,?)''',
+        rounds)
+    dprint("Initializing DB Table: 'round_details' ...")
+    c.executemany('''INSERT INTO round_details VALUES (?,?,?,?,?,?,?)''',
+                  round_details)
 
 
 def initialize_db():

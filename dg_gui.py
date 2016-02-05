@@ -4,19 +4,20 @@ Python script to present a Disc Golf GUI, that allows
 us to keep track of courses and holes on that course
 
 TO DO:
-    - implement updating/saving the database
+    - implement updating the database (rounds only, to update score)
 
-    - fix floating point formatting for the "Score" column
-      of the Round Scoring frame
+    - handle conflict when trying to add a new round, when
+      it is not unique
 
-    - implement looking at results (including graphing?)
+    - handle case when we calculate, and no values change, but
+      DB thinks it has been modified
+
+    - use real fraction math to get fractions correct for "score"
 
     - make setup window become the scoring window for a round,
       instead of just replacing one window with the next
 
-    - for scoring window:
-      - implement "commit"
-
+    - implement looking at results (including graphing?)
     - display results, e.g. year-to-date, custom-range?
       (and what about a graph? woo hoo!)
 
@@ -26,18 +27,16 @@ TO DO:
 
     - support DB modification for Courses and Players (some day)
 
-    - Properly package for distribution
+    - support modifying a round to add or remove a player,
+      or even to remove a round? (not needed?)
+
+    - Properly package for distribution (for who?)
 
     - implement real help? (like what?)
-
-    - Add pictures to DB some day? (e.g. for start screen?)
 
     - preferences? not really needed yet: nothing to configure/prefer
       - e.g. which players are "usually there"
       - size of windows?
-
-    - disable/enable menu choices as DB gets modified/saved
-      (not needed?)
 
 History:
     Version 1.0: menu bar present, hooked up, but on
@@ -61,6 +60,7 @@ from optparse import OptionParser
 import wx
 import re
 import datetime as dt
+from wx.lib.pubsub import Publisher as pub
 
 import rdb
 from utils import dprint
@@ -138,7 +138,7 @@ class SetupRoundFrame(wx.Frame):
         vbox.Add(hbox2, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
         ################################################################
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
-        cancel_button = wx.Button(panel, id=wx.ID_EXIT, label='Done')
+        cancel_button = wx.Button(panel, id=wx.ID_EXIT, label='Cancel')
         date_label = wx.StaticText(panel, label='Date')
         self.round_date = wx.DatePickerCtrl(panel, size=wx.Size(110, 20))
         self.score_button = wx.Button(panel, label='Score a Round')
@@ -187,10 +187,13 @@ class SetupRoundFrame(wx.Frame):
         cnum = self.course_list.GetItemData(i)
         dprint("Course number: %d" % cnum)
         wx_rdate = self.round_date.GetValue()
+        dprint("Raw date:", wx_rdate)
         rdate = dt.datetime(wx_rdate.GetYear(),
-                            wx_rdate.GetMonth(),
+                            wx_rdate.GetMonth() + 1,
                             wx_rdate.GetDay())
-        dprint("round date:", rdate)
+        dprint("round date (from Yr=%d, month=%d, day=%d):" % \
+               (wx_rdate.GetYear(), wx_rdate.GetMonth() + 1, wx_rdate.GetDay()),
+               rdate)
         ################################################################
         this_round = rdb.Round(rdb.next_round_num(), cnum,
                                rdate.strftime("%m/%d/%Y"))
@@ -209,12 +212,12 @@ class SetupRoundFrame(wx.Frame):
         ################################################################
         # popup a window to enter the scores for round then go away
         srf = RoundScoreFrame(self.GetParent(), title='Score a Round')
-        srf.MyCreate(this_round, round_details)
+        srf.MyCreate(this_round, round_details, for_update=False)
         self.Destroy()
 
     def OnQuit(self, e):
-        # XXX Need to check for database modified here, with a popup?
-        dprint("QUITing ...")
+        # XXX Do we need to check for database modified here, with a popup?
+        dprint("QUITing SetupRoundFrame")
         self.Destroy()
 
     def InitUI(self):
@@ -231,6 +234,12 @@ class RoundScoreFrame(wx.Frame):
         super(RoundScoreFrame, self).__init__(*args, **kwargs)
         self.SetSize(wx.Size(500, 300))
         self.is_edited = False
+        self.cnum = None
+        self.rdate = None
+        self.for_update = None
+        self.this_round = None
+        self.for_update = None
+        self.round_details = None
 
     def MyCreate(self, this_round, round_details, for_update=False):
         self.cnum = this_round.course_num
@@ -312,9 +321,9 @@ class RoundScoreFrame(wx.Frame):
         self.calc_button = wx.Button(panel, id=wx.ID_SETUP,
                                           label='Calculate')
         #self.calc_button.Disable()
-        self.Bind(wx.EVT_BUTTON, self.Cancel, source=cancel_button)
-        self.Bind(wx.EVT_BUTTON, self.Commit, source=self.commit_button)
-        self.Bind(wx.EVT_BUTTON, self.Calculate, source=self.calc_button)
+        self.Bind(wx.EVT_BUTTON, self.OnCancel, source=cancel_button)
+        self.Bind(wx.EVT_BUTTON, self.OnCommit, source=self.commit_button)
+        self.Bind(wx.EVT_BUTTON, self.OnCalculate, source=self.calc_button)
         hbox4.AddSpacer(10)
         hbox4.Add(cancel_button)
         hbox4.AddStretchSpacer(1)
@@ -328,8 +337,14 @@ class RoundScoreFrame(wx.Frame):
         self.status_bar = self.CreateStatusBar()
         self.status_bar.SetStatusText("Please fill in the scores")
 
-    def Commit(self, e):
-        dprint("Commit DB: NOT YET IMPLEMENTED")
+    def OnCommit(self, e):
+        dprint("Commit DB requested -- hope you're sure")
+        rdb.add_round(self.this_round, self.round_details)
+        rdb.commit_db()
+        dprint("Updating parent ...")
+        pub.sendMessage("NEW ROUND", self.this_round)
+        self.is_edited = False
+        self.Close()
 
     def RoundDetailsAsDict(self):
         dprint("Making Round Details into dictionary ...")
@@ -353,7 +368,7 @@ class RoundScoreFrame(wx.Frame):
                                             rd.score)
         return item_data
 
-    def Calculate(self, e):
+    def OnCalculate(self, e):
         # get data from list into
         cnt = self.score_list.GetItemCount()
         dprint("Our list has %d items" % cnt)
@@ -395,7 +410,7 @@ class RoundScoreFrame(wx.Frame):
         self.commit_button.Enable()
         self.is_edited = True
 
-    def Cancel(self, e):
+    def OnCancel(self, e):
         dprint("Cancel!: Edited=%s" % self.is_edited)
         if self.is_edited:
             res = wx.MessageBox('Data Modified. Are you sure?',
@@ -422,9 +437,7 @@ class RoundsFrame(wx.Frame):
         super(RoundsFrame, self).__init__(*args, **kwargs)
         self.SetSize(wx.Size(300, 300))
         self.InitUI()
-
-    def SetRounds(self, rnd_list):
-        self.round_list.SetupListItems(rnd_list)
+        pub.subscribe(self.NewRoundExists, "NEW ROUND")
 
     def SetUpPanel(self):
         panel = wx.Panel(self, style=wx.SIMPLE_BORDER)
@@ -452,20 +465,7 @@ class RoundsFrame(wx.Frame):
                                       wx.LIST_FORMAT_LEFT,
                                       wx.LIST_FORMAT_LEFT],
                                      ['%s', '%s', '%s'])
-        item_data = {}
-        for c, rnd in rdb.RoundList.iteritems():
-            course_name = rdb.CourseList[rnd.course_num].name
-            dprint("Searching for players for round number: %d" % rnd.num)
-            player_cnt = 0
-            for rd in rdb.RoundDetailList:
-                dprint("Looking for round %d in:" % rnd.num, rd)
-                if rd.round_num == rnd.num:
-                    player_cnt += 1
-            # items must be strings for the GUI
-            item_data[c] = (rnd.rdate.strftime("%m/%d/%Y") ,
-                            course_name,
-                            str(player_cnt))
-        self.SetRounds(item_data)
+        self.SetRoundList()
         hbox2.Add(self.round_list, 1, wx.EXPAND|wx.ALL, border=10)
         vbox.Add(hbox2, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.ListSelected,
@@ -490,6 +490,28 @@ class RoundsFrame(wx.Frame):
         ################################################################
         panel.SetSizer(vbox)
         ################################################################
+
+    def SetRoundList(self):
+        dprint("Setting Round List for this frame")
+        item_data = {}
+        for c, rnd in rdb.RoundList.iteritems():
+            dprint("looking at %d:" % c, rnd)
+            course_name = rdb.CourseList[rnd.course_num].name
+            dprint("Searching for players for round number: %d" % rnd.num)
+            player_cnt = 0
+            for rd in rdb.RoundDetailList:
+                dprint("Looking for round %d in:" % rnd.num, rd)
+                if rd.round_num == rnd.num:
+                    player_cnt += 1
+            # items must be strings for the GUI
+            item_data[c] = (rnd.rdate.strftime("%m/%d/%Y") ,
+                            course_name,
+                            str(player_cnt))
+        self.SetRounds(item_data)
+
+    def SetRounds(self, rnd_list):
+        dprint("Setting rounds list data for this frame")
+        self.round_list.SetupListItems(rnd_list)
 
     def ListSelected(self, e):
         dprint("List Selected")
@@ -516,6 +538,12 @@ class RoundsFrame(wx.Frame):
                 round_details.append(rd)
         srf = RoundScoreFrame(self, title='Examine a Round')
         srf.MyCreate(rnd, round_details, for_update=True)
+
+    def NewRoundExists(self, message):
+        dprint("New Round to be displayed: %s" % message)
+        rdb.init_rounds()
+        self.SetRoundList()
+        self.Show(True)
 
     def SetUpMenuBar(self):
         # create the 'File' menu and fill it in
@@ -554,18 +582,16 @@ class RoundsFrame(wx.Frame):
             dprint("save the current datbase: NOT YET IMPLEMENTED")
 
     def OnQuit(self, e):
-        # XXX Need to check for database modified here, with a popup?
-        dprint("QUITing ...")
+        # XXX Do we need to check for database modified here, with a popup?
+        dprint("QUITing RoundsFrame")
         self.Destroy()
 
     def OnAbout(self, e):
-
         description = """Disc Golf Score Manager manages and scores Disc
 Golf rounds. It contains a list of Players and a list of Courses
 and it allows users to edit existing rounds or create new ones.
 It will also soon support displaying results, dude! New versions
 may very well solve the P-vs-NP problem, if we're lucky!"""
-        
         licence = """Disc Golf Score Manager is free software;
 you can redistribute it and/or modify it under the terms of the
 GNU General Public License as published by the Free Software
@@ -579,9 +605,7 @@ See the GNU General Public License for more details. You should have
 received a copy of the GNU General Public License along with File Hunter; 
 if not, write to the Free Software Foundation, Inc., 59 Temple Place, 
 Suite 330, Boston, MA  02111-1307  USA"""
-
         info = wx.AboutDialogInfo()
-
         info.SetIcon(wx.Icon('AboutIcon.png', wx.BITMAP_TYPE_PNG))
         info.SetName('Disc Golf Score Manager')
         info.SetVersion(__version__)

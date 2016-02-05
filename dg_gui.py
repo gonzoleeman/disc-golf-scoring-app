@@ -4,20 +4,19 @@ Python script to present a Disc Golf GUI, that allows
 us to keep track of courses and holes on that course
 
 TO DO:
-    - implement "look at a round" GUI
     - implement updating the database
-    - implement saving the database
-    - implement opening a new database
-    - implement looking at results GUI
 
-    - make setup window go away when scoring a round (use
-      same window, with tabs or something?)
+    - fix floating point formatting for the "Score" column
+      of the Round Scoring frame
+
+    - implement looking at results (including graphing?)
+
+    - make setup window become the scoring window for a round,
+      instead of just replacing one window with the next
 
     - "are you sure" popup if exit with database modified
 
     - implement "About" popup
-
-    - support DB modification for Courses (some day)
 
     - for scoring window:
       - implement "commit"
@@ -26,6 +25,11 @@ TO DO:
         become "Add/Update", depending on the purpose of the window
 
     -------------------------------
+
+    - support DB modification for Courses and Players (some day)
+
+    - implement saving the database
+    - implement opening a new database
 
     - Properly package for distribution
 
@@ -115,7 +119,8 @@ class SetupRoundFrame(wx.Frame):
         self.course_list = lc.AutoWidthListCtrl(panel)
         #self.course_list.InsertColumn(0, 'Choose a Course', width=100)
         self.course_list.SetupListHdr(['Choose a Course'],
-                                      [wx.LIST_FORMAT_LEFT])
+                                      [wx.LIST_FORMAT_LEFT],
+                                      ['%s'])
         item_data = {}
         for k, c in rdb.CourseList.iteritems():
             item_data[k] = (c.name,)
@@ -129,6 +134,9 @@ class SetupRoundFrame(wx.Frame):
         #    cnt += 1
         hbox2.Add(self.course_list, 1, wx.EXPAND|wx.RIGHT, border=10)
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.CourseListSelected,
+                  source=self.course_list,
+                  id=wx.ID_ANY)
+        self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.CourseListSelected,
                   source=self.course_list,
                   id=wx.ID_ANY)
         vbox.Add(hbox2, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
@@ -171,7 +179,7 @@ class SetupRoundFrame(wx.Frame):
         self.SetScoreButtonState()
 
     def CourseListSelected(self, e):
-        dprint("Course[%d] Selected" % e.Index)
+        dprint("Course[%d] Selected:" % e.Index, e)
         self.SetScoreButtonState()
 
     def OnScoreARound(self, e):
@@ -286,7 +294,9 @@ class RoundScoreFrame(wx.Frame):
                                       wx.LIST_FORMAT_CENTER,
                                       wx.LIST_FORMAT_CENTER,
                                       wx.LIST_FORMAT_CENTER,
-                                      wx.LIST_FORMAT_RIGHT])
+                                      wx.LIST_FORMAT_RIGHT],
+                                     ['%s', '%d', '%d',
+                                      '%d', '%d', '%5.2f'])
         item_data = self.RoundDetailsAsDict()
         self.score_list.SetupListItems(item_data)
         hbox3.Add(self.score_list, 1, wx.EXPAND|wx.ALL, border=10)
@@ -297,7 +307,10 @@ class RoundScoreFrame(wx.Frame):
         ################################################################
         hbox4 = wx.BoxSizer(wx.HORIZONTAL)
         cancel_button = wx.Button(panel, id=wx.ID_CANCEL, label='Cancel')
-        self.commit_button = wx.Button(panel, id=wx.ID_SAVE, label='Commit')
+        lab = 'Commit'
+        if self.for_update:
+            lab = 'Update'
+        self.commit_button = wx.Button(panel, id=wx.ID_SAVE, label=lab)
         self.commit_button.Disable()
         self.calc_button = wx.Button(panel, id=wx.ID_SETUP,
                                           label='Calculate')
@@ -431,7 +444,8 @@ class RoundsFrame(wx.Frame):
         self.round_list.SetupListHdr(['Date', 'Course', 'Players'],
                                      [wx.LIST_FORMAT_LEFT,
                                       wx.LIST_FORMAT_LEFT,
-                                      wx.LIST_FORMAT_LEFT])
+                                      wx.LIST_FORMAT_LEFT],
+                                     ['%s', '%s', '%s'])
         item_data = {}
         for c, rnd in rdb.RoundList.iteritems():
             course_name = rdb.CourseList[rnd.course_num].name
@@ -452,6 +466,7 @@ class RoundsFrame(wx.Frame):
                   source=self.round_list, id=wx.ID_ANY)
         self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.ListDeselected,
                   source=self.round_list, id=wx.ID_ANY)
+        self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.OnShow)
         ################################################################
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
         #self.quit_button = wx.Button(panel, id=wx.ID_EXIT, label='Quit')
@@ -459,11 +474,8 @@ class RoundsFrame(wx.Frame):
         self.new_button = wx.Button(panel, id=wx.ID_NEW, label='New Round')
         self.show_button.Disable()
         self.Bind(wx.EVT_BUTTON, self.OnNewRound, source=self.new_button)
-        #self.Bind(wx.EVT_BUTTON, self.OnQuit, source=self.quit_button)
         self.Bind(wx.EVT_BUTTON, self.OnShow, source=self.show_button)
         hbox3.AddSpacer(10)
-        #hbox3.Add(self.quit_button)
-        #hbox3.AddStretchSpacer(1)
         hbox3.Add(self.show_button)
         hbox3.AddStretchSpacer(1)
         hbox3.Add(self.new_button)
@@ -497,21 +509,11 @@ class RoundsFrame(wx.Frame):
             if rnd.num == rd.round_num:
                 round_details.append(rd)
         srf = RoundScoreFrame(self, title='Examine a Round')
-        srf.MyCreate(rnd, round_details)
+        srf.MyCreate(rnd, round_details, for_update=True)
 
     def SetUpMenuBar(self):
         # create the 'File' menu and fill it in
         fmenu = wx.Menu()
-
-        omi = wx.MenuItem(fmenu, wx.ID_OPEN, '&Open')
-        fmenu.AppendItem(omi)
-        self.Bind(wx.EVT_MENU, self.DBUpdate, omi, wx.ID_OPEN)
-
-        smi = wx.MenuItem(fmenu, wx.ID_SAVE, '&Save')
-        fmenu.AppendItem(smi)
-        self.Bind(wx.EVT_MENU, self.DBUpdate, smi, wx.ID_SAVE)
-
-        fmenu.AppendSeparator()
 
         qmi = wx.MenuItem(fmenu, wx.ID_EXIT, '&Quit')
         fmenu.AppendItem(qmi)

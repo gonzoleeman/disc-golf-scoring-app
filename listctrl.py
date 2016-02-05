@@ -19,6 +19,15 @@ __author__ = "Lee Duncan"
 
 ListEditedEvt, EVT_LIST_EDITED_EVT = wxne.NewCommandEvent()
 
+def d2s(f, d):
+    '''
+    Convert data "d" to a string using format "f", but return the
+    string "None" if d has value None
+    '''
+    if d is None:
+        return 'None'
+    return f % d
+
 
 class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
                             wxlc.TextEditMixin, wxlc.ColumnSorterMixin):
@@ -31,11 +40,12 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
         self.Bind(wx.EVT_LIST_BEGIN_LABEL_EDIT, self.CheckEditBegin)
         self.Bind(wx.EVT_LIST_END_LABEL_EDIT, self.CheckEditEnd)
         self.num_columns = 0
+        self.itemColumnFmt = []
 
     def GetListCtrl(self):
         return self
 
-    def SetupListHdr(self, itemHdr, itemFmt):
+    def SetupListHdr(self, itemHdr, itemFmt, itemColumnFmt=None):
         self.num_columns = len(itemHdr)
         wxlc.ColumnSorterMixin.__init__(self, self.num_columns)
         col_width = 100
@@ -46,6 +56,7 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
             self.InsertColumn(col_idx, item, width=col_width, format=lformat)
             col_width = 75
         self.SetColumnCount(self.num_columns)
+        self.itemColumnFmt = itemColumnFmt
 
     def SetupListItems(self, item_data):
         self.DeleteAllItems()
@@ -54,9 +65,12 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
         for key, data in self.itemDataMap.items():
             dprint("Edit List: Filling in row %d with key=%d:" % \
                    (data_idx, key), data)
-            self.InsertStringItem(data_idx, str(data[0]))
+            cfmt = self.itemColumnFmt[0]
+            self.InsertStringItem(data_idx, d2s(cfmt, data[0]))
             for col_idx in range(1, self.num_columns):
-                self.SetStringItem(data_idx, col_idx, str(data[col_idx]))
+                cfmt = self.itemColumnFmt[col_idx]
+                self.SetStringItem(data_idx, col_idx,
+                                   d2s(cfmt, data[col_idx]))
             self.SetItemData(data_idx, key)
             data_idx += 1
         wxlc.TextEditMixin.__init__(self)
@@ -114,7 +128,7 @@ class AutoWidthListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
     def GetListCtrl(self):
         return self
 
-    def SetupListHdr(self, itemHdr, itemFmt):
+    def SetupListHdr(self, itemHdr, itemFmt, itemColumnFmt):
         self.num_columns = len(itemHdr)
         wxlc.ColumnSorterMixin.__init__(self, self.num_columns)
         col_width = 100
@@ -125,6 +139,7 @@ class AutoWidthListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
             self.InsertColumn(col_idx, item, width=col_width, format=lformat)
             col_width = 75
         self.SetColumnCount(self.num_columns)
+        self.itemColumnFmt = itemColumnFmt
 
     def SetupListItems(self, item_data):
         self.DeleteAllItems()
@@ -133,9 +148,11 @@ class AutoWidthListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
         for key, data in self.itemDataMap.items():
             dprint("Width List: Filling in row %d with key=%d:" % \
                    (data_idx, key), data)
-            self.InsertStringItem(data_idx, str(data[0]))
+            cfmt = self.itemColumnFmt[0]
+            self.InsertStringItem(data_idx, d2s(cfmt, data[0]))
             for col_idx in range(1, self.num_columns):
-                self.SetStringItem(data_idx, col_idx, data[col_idx])
+                cfmt = self.itemColumnFmt[col_idx]
+                self.SetStringItem(data_idx, col_idx, d2s(cfmt, data[col_idx]))
             self.SetItemData(data_idx, key)
             data_idx += 1
 

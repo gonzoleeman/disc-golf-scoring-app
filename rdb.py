@@ -26,6 +26,7 @@ __author__ = "Lee Duncan"
 import sqlite3
 from dateutil.parser import parse as parse_date
 import datetime as dt
+import itertools as it
 
 from utils import dprint
 from opts import opts
@@ -223,20 +224,31 @@ def add_round(rnd, rd_list):
     dprint("And rounds:")
     for rd in rd_list:
         dprint(rd)
-    dprint("NOT YET IMPLEMENTED")
-    cmd = ('''INSERT INTO rounds(course_num, round_date)
-              VALUES(%d,"%s")''' % (rnd.num, rnd.rdate.strftime("%m/%d/%Y")))
-    dprint("DB Cmd: %s" % cmd)
-    db_cmd_exec(cmd)
+    db_cmd_exec('''INSERT INTO rounds(course_num, round_date)
+                   VALUES(%d,"%s")''' % \
+                (rnd.course_num, rnd.rdate.strftime("%m/%d/%Y")))
     for rd in rd_list:
-        cmd = ("INSERT INTO round_details " + \
+        db_cmd_exec("INSERT INTO round_details " + \
                     "VALUES(%d,%d,%d,%d,%d,%d,%f)" % \
                     (rd.round_num, rd.player_num, rd.fscore, rd.bscore,
                      rd.acnt, rd.ecnt, rd.score))
-        dprint("DB Cmd: %s" % cmd)
-        db_cmd_exec(cmd)
 
 
 def modify_round(rnd, rd_list):
     '''Modify the specified round and list of round details in the DB'''
-    dprint("NOT YET IMPLEMENTED")
+    dprint("Modify Round: NOT YET IMPLEMENTED")
+
+def round_details_equal(rd_list1, rd_list2):
+    dprint("comparing two round detail lists ...")
+    rd_list1 = sorted(rd_list1, key=lambda rd: rd.player_num)
+    rd_list2 = sorted(rd_list2, key=lambda rd: rd.player_num)
+    if len(rd_list1) != len(rd_list2):
+        dprint("lists have different lengths")
+        return True
+    for rd1, rd2 in it.izip(rd_list1, rd_list2):
+        dprint("Comparing:", rd1, ", ", rd2)
+        if rd1 != rd2:
+            dprint("items unequal", rd1, ", ", rd2)
+            return True
+    dprint("Item lists equals!")
+    return False

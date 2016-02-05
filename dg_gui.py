@@ -61,6 +61,7 @@ import wx
 import re
 import datetime as dt
 from wx.lib.pubsub import Publisher as pub
+import copy
 
 import rdb
 from utils import dprint
@@ -338,11 +339,15 @@ class RoundScoreFrame(wx.Frame):
         self.status_bar.SetStatusText("Please fill in the scores")
 
     def OnCommit(self, e):
-        dprint("Commit DB requested -- hope you're sure")
-        rdb.add_round(self.this_round, self.round_details)
-        rdb.commit_db()
-        dprint("Updating parent ...")
-        pub.sendMessage("NEW ROUND", self.this_round)
+        dprint("Commit/Update DB requested -- hope you're sure")
+        if self.for_update:
+            dprint("Oh Oh -- DB update NOT YET IMPLEMENTED")
+            return # XXX for now
+        else:
+            rdb.add_round(self.this_round, self.round_details)
+            rdb.commit_db()
+            dprint("Updating parent ...")
+        pub.sendMessage("ROUND UPDATE", self.this_round)
         self.is_edited = False
         self.Close()
 
@@ -400,15 +405,16 @@ class RoundScoreFrame(wx.Frame):
             self.status_bar.SetStatusText("")
             self.status_bar.SetBackgroundColour(wx.NullColour)
         dprint("All fields OK! scoring ...")
+        pre_scored_details = copy.deepcopy(self.round_details)
         scored_details = score.score_round(self.round_details)
-        for d in scored_details:
-            dprint("Score Details Calculated:", d)
-        self.round_details = scored_details
-        item_data = self.RoundDetailsAsDict()
-        self.score_list.SetupListItems(item_data)
-        #self.calc_button.Disable()
-        self.commit_button.Enable()
-        self.is_edited = True
+        self.is_edited = rdb.round_details_equal(pre_scored_details,
+                                                 scored_details)
+        if self.is_edited:
+            self.round_details = scored_details
+            item_data = self.RoundDetailsAsDict()
+            self.score_list.SetupListItems(item_data)
+            #self.calc_button.Disable()
+            self.commit_button.Enable()
 
     def OnCancel(self, e):
         dprint("Cancel!: Edited=%s" % self.is_edited)
@@ -437,7 +443,7 @@ class RoundsFrame(wx.Frame):
         super(RoundsFrame, self).__init__(*args, **kwargs)
         self.SetSize(wx.Size(300, 300))
         self.InitUI()
-        pub.subscribe(self.NewRoundExists, "NEW ROUND")
+        pub.subscribe(self.NewRoundExists, "ROUND UPDATE")
 
     def SetUpPanel(self):
         panel = wx.Panel(self, style=wx.SIMPLE_BORDER)

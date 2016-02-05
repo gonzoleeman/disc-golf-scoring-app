@@ -11,6 +11,7 @@ import wx
 import wx.lib.mixins.listctrl as wxlc
 import wx.lib.newevent as wxne
 import re
+import operator
 
 
 __version__ = "1.0"
@@ -62,7 +63,10 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
         self.DeleteAllItems()
         self.itemDataMap = item_data
         data_idx = 0
-        for key, data in self.itemDataMap.items():
+        # sort list by keys
+        sorted_items = sorted(item_data.items(), key=operator.itemgetter(0))
+        #for key, data in self.itemDataMap.items():
+        for (key, data) in sorted_items:
             dprint("Edit List: Filling in row %d with key=%d:" % \
                    (data_idx, key), data)
             cfmt = self.itemColumnFmt[0]

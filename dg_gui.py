@@ -4,22 +4,27 @@ Python script to present a Disc Golf GUI, that allows
 us to keep track of courses and holes on that course
 
 TO DO:
-    - implement updating the database (rounds only, to update score)
+    - When Examing a round, if you calcuate then cancel, the data
+      is still present!
 
     - handle conflict when trying to add a new round, when
-      it is not unique
+      it is not unique (needed)
 
     - handle case when we calculate, and no values change, but
-      DB thinks it has been modified
+      DB thinks it has been modified (optimization)
 
     - use real fraction math to get fractions correct for "score"
+      (for accuracy)
 
     - make setup window become the scoring window for a round,
-      instead of just replacing one window with the next
+      instead of just replacing one window with the next (optimization)
 
-    - implement looking at results (including graphing?)
+    - implement looking at results (including graphing?) (needed)
     - display results, e.g. year-to-date, custom-range?
       (and what about a graph? woo hoo!)
+
+    - consider RETURN key in main window like Show/Edit button hit
+      (optimization)
 
     -------------------------------
 
@@ -108,7 +113,7 @@ class SetupRoundFrame(wx.Frame):
             player_data[k] = v.name
         self.player_list.SetupList('Choose Players', player_data)
         hbox2.Add(self.player_list, 1, wx.EXPAND|wx.LEFT, border=10)
-        self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.PlayerListSelected,
+        self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnPlayerListSelected,
                   source=self.player_list,
                   id=wx.ID_ANY)
         ################################################################
@@ -130,12 +135,12 @@ class SetupRoundFrame(wx.Frame):
         #    dprint("Inserted %s in list, index=%d" % (c, cnt))
         #    cnt += 1
         hbox2.Add(self.course_list, 1, wx.EXPAND|wx.RIGHT, border=10)
-        self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.CourseListSelected,
+        self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnCourseListSelected,
                   source=self.course_list,
                   id=wx.ID_ANY)
-        self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.CourseListSelected,
-                  source=self.course_list,
-                  id=wx.ID_ANY)
+        #self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.OnCourseListSelected,
+        #          source=self.course_list,
+        #          id=wx.ID_ANY)
         vbox.Add(hbox2, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
         ################################################################
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
@@ -169,13 +174,13 @@ class SetupRoundFrame(wx.Frame):
         else:
             self.score_button.Disable()
 
-    def PlayerListSelected(self, e):
+    def OnPlayerListSelected(self, e):
         dprint("Player[%d] Selected" % e.Index)
         self.player_list.Select(e.Index, False)
         self.player_list.ToggleItem(e.Index)
         self.SetScoreButtonState()
 
-    def CourseListSelected(self, e):
+    def OnCourseListSelected(self, e):
         dprint("Course[%d] Selected:" % e.Index, e)
         self.SetScoreButtonState()
 
@@ -237,7 +242,7 @@ class RoundScoreFrame(wx.Frame):
         self.is_edited = False
         self.cnum = None
         self.rdate = None
-        self.for_update = None
+        self.for_update = False
         self.this_round = None
         self.for_update = None
         self.round_details = None
@@ -249,7 +254,7 @@ class RoundScoreFrame(wx.Frame):
         dprint("Score Create: Course[%d], round date: %s" % \
                (self.cnum, self.rdate))
         self.this_round = this_round
-        self.round_details = round_details
+        self.round_details = sorted(round_details, key=lambda rd: rd.player_num)
         dprint("Added round details:")
         for rd in round_details:
             dprint(rd)
@@ -309,14 +314,12 @@ class RoundScoreFrame(wx.Frame):
         hbox3.Add(self.score_list, 1, wx.EXPAND|wx.ALL, border=10)
         vbox.Add(hbox3, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
         ################################################################
-        self.Bind(lc.EVT_LIST_EDITED_EVT, self.ListEditedEvent,
+        self.Bind(lc.EVT_LIST_EDITED_EVT, self.OnListEdited,
                   source=self.score_list)
         ################################################################
         hbox4 = wx.BoxSizer(wx.HORIZONTAL)
         cancel_button = wx.Button(panel, id=wx.ID_CANCEL, label='Cancel')
-        lab = 'Commit'
-        if self.for_update:
-            lab = 'Update'
+        lab = ('Update' if self.for_update else 'Commit')
         self.commit_button = wx.Button(panel, id=wx.ID_SAVE, label=lab)
         self.commit_button.Disable()
         self.calc_button = wx.Button(panel, id=wx.ID_SETUP,
@@ -339,14 +342,14 @@ class RoundScoreFrame(wx.Frame):
         self.status_bar.SetStatusText("Please fill in the scores")
 
     def OnCommit(self, e):
-        dprint("Commit/Update DB requested -- hope you're sure")
+        dprint("OnCommit: string=%s" % e.GetString())
+        dprint("%s DB requested -- hope you're sure")
         if self.for_update:
-            dprint("Oh Oh -- DB update NOT YET IMPLEMENTED")
-            return # XXX for now
+            rdb.modify_round(self.this_round, self.round_details)
         else:
             rdb.add_round(self.this_round, self.round_details)
         rdb.commit_db()
-        dprint("Updating parent ...")
+        dprint("Updating parent GUI ...")
         pub.sendMessage("ROUND UPDATE", self.this_round)
         self.is_edited = False
         self.Close()
@@ -357,26 +360,16 @@ class RoundScoreFrame(wx.Frame):
         for rd in self.round_details:
             dprint("Round Detail:", rd)
             player = rdb.PlayerList[rd.player_num]
-            if False:
-                item_data[rd.player_num] = (player.name,
-                                            str(rd.fscore),
-                                            str(rd.bscore),
-                                            str(rd.acnt),
-                                            str(rd.ecnt),
-                                            str(rd.score))
-            else:
-                item_data[rd.player_num] = (player.name,
-                                            rd.fscore,
-                                            rd.bscore,
-                                            rd.acnt,
-                                            rd.ecnt,
-                                            rd.score)
+            item_data[rd.player_num] = (player.name,
+                                        rd.fscore, rd.bscore,
+                                        rd.acnt, rd.ecnt,
+                                        rd.calc_score)
         return item_data
 
     def OnCalculate(self, e):
         # get data from list into
         cnt = self.score_list.GetItemCount()
-        dprint("Our list has %d items" % cnt)
+        dprint("Our round detail list has %d items" % cnt)
         for c in range(cnt):
             dprint("Looking for round_detail index %d" % c)
             round_detail = self.round_details[c]
@@ -407,14 +400,23 @@ class RoundScoreFrame(wx.Frame):
         dprint("All fields OK! scoring ...")
         pre_scored_details = copy.deepcopy(self.round_details)
         scored_details = score.score_round(self.round_details)
-        self.is_edited = rdb.round_details_equal(pre_scored_details,
-                                                 scored_details)
+        dprint("BEFORE comparing round details, here are both:")
+        for rd in pre_scored_details:
+            dprint("pre-socred[]: ", rd)
+        for rd in scored_details:
+            dprint("post-socred[]:", rd)
+
+        self.is_edited = not rdb.round_details_equal(pre_scored_details,
+                                                     scored_details)
         if self.is_edited:
+            dprint("List *WAS* edited: updating")
             self.round_details = scored_details
             item_data = self.RoundDetailsAsDict()
             self.score_list.SetupListItems(item_data)
             #self.calc_button.Disable()
             self.commit_button.Enable()
+        else:
+            dprint("List was /not/ edited, so no update to do :(")
 
     def OnCancel(self, e):
         dprint("Cancel!: Edited=%s" % self.is_edited)
@@ -427,7 +429,7 @@ class RoundScoreFrame(wx.Frame):
                 return
         self.Close()
 
-    def ListEditedEvent(self, evt):
+    def OnListEdited(self, evt):
         dprint("Our List has been Edited!!!")
         #self.calc_button.Enable()
         self.commit_button.Disable()
@@ -443,7 +445,7 @@ class RoundsFrame(wx.Frame):
         super(RoundsFrame, self).__init__(*args, **kwargs)
         self.SetSize(wx.Size(300, 300))
         self.InitUI()
-        pub.subscribe(self.NewRoundExists, "ROUND UPDATE")
+        pub.subscribe(self.OnNewRoundExists, "ROUND UPDATE")
 
     def SetUpPanel(self):
         panel = wx.Panel(self, style=wx.SIMPLE_BORDER)
@@ -474,15 +476,16 @@ class RoundsFrame(wx.Frame):
         self.SetRoundList()
         hbox2.Add(self.round_list, 1, wx.EXPAND|wx.ALL, border=10)
         vbox.Add(hbox2, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
-        self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.ListSelected,
+        self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnListSelected,
                   source=self.round_list, id=wx.ID_ANY)
-        self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.ListDeselected,
+        self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.OnListDeselected,
                   source=self.round_list, id=wx.ID_ANY)
         self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.OnShow)
         ################################################################
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
         #self.quit_button = wx.Button(panel, id=wx.ID_EXIT, label='Quit')
-        self.show_button = wx.Button(panel, id=wx.ID_EDIT, label='Show Round')
+        self.show_button = wx.Button(panel, id=wx.ID_EDIT,
+                                     label='Show/Edit Round')
         self.new_button = wx.Button(panel, id=wx.ID_NEW, label='New Round')
         self.show_button.Disable()
         self.Bind(wx.EVT_BUTTON, self.OnNewRound, source=self.new_button)
@@ -519,11 +522,11 @@ class RoundsFrame(wx.Frame):
         dprint("Setting rounds list data for this frame")
         self.round_list.SetupListItems(rnd_list)
 
-    def ListSelected(self, e):
+    def OnListSelected(self, e):
         dprint("List Selected")
         self.show_button.Enable()
 
-    def ListDeselected(self, e):
+    def OnListDeselected(self, e):
         dprint("List Deselected")
         self.show_button.Disable()
 
@@ -545,47 +548,12 @@ class RoundsFrame(wx.Frame):
         srf = RoundScoreFrame(self, title='Examine a Round')
         srf.MyCreate(rnd, round_details, for_update=True)
 
-    def NewRoundExists(self, message):
-        dprint("New Round to be displayed: %s" % message)
+    def OnNewRoundExists(self, message):
+        '''A "NEW ROUND" message has been received'''
+        dprint("Message Received: New Round: %s" % message)
         rdb.init_rounds()
         self.SetRoundList()
         self.Show(True)
-
-    def SetUpMenuBar(self):
-        # create the 'File' menu and fill it in
-        fmenu = wx.Menu()
-
-        qmi = wx.MenuItem(fmenu, wx.ID_EXIT, '&Quit')
-        fmenu.AppendItem(qmi)
-        self.Bind(wx.EVT_MENU, self.OnQuit, qmi, wx.ID_EXIT)
-
-        accel_tbl = wx.AcceleratorTable([\
-                (wx.ACCEL_CTRL, ord('Q'), wx.ID_EXIT),
-                (wx.ACCEL_CTRL, ord('O'), wx.ID_OPEN),
-                (wx.ACCEL_CTRL, ord('S'), wx.ID_SAVE),
-                ])
-        self.SetAcceleratorTable(accel_tbl)
-
-        # create the help menu
-        hmenu = wx.Menu()
-        hmi = wx.MenuItem(hmenu, wx.ID_ABOUT, 'About')
-        hmenu.AppendItem(hmi)
-        self.Bind(wx.EVT_MENU, self.OnAbout, hmi, wx.ID_ABOUT)
-
-        # create and fill in the mnu bar
-        mbar = wx.MenuBar()
-        mbar.Append(fmenu, '&File')
-        mbar.Append(hmenu, '&Help')
-
-        self.SetMenuBar(mbar)
-
-    def DBUpdate(self, e):
-        '''A DB Update menu item has been choosen'''
-        dprint('DBUpdate: id=', e.GetId())
-        if e.GetId() == wx.ID_OPEN:
-            dprint("open a new datbase: NOT YET IMPLEMENTED")
-        else:
-            dprint("save the current datbase: NOT YET IMPLEMENTED")
 
     def OnQuit(self, e):
         # XXX Do we need to check for database modified here, with a popup?
@@ -626,10 +594,41 @@ Suite 330, Boston, MA  02111-1307  USA"""
         info.AddTranslator('Cyndi Duncan')
         wx.AboutBox(info)
 
+    def SetUpMenuBar(self):
+        # create the 'File' menu and fill it in
+        fmenu = wx.Menu()
+
+        qmi = wx.MenuItem(fmenu, wx.ID_EXIT, '&Quit')
+        fmenu.AppendItem(qmi)
+        self.Bind(wx.EVT_MENU, self.OnQuit, qmi, wx.ID_EXIT)
+
+        accel_tbl = wx.AcceleratorTable([\
+                (wx.ACCEL_CTRL, ord('Q'), wx.ID_EXIT),
+                (wx.ACCEL_CTRL, ord('O'), wx.ID_OPEN),
+                (wx.ACCEL_CTRL, ord('S'), wx.ID_SAVE),
+                ])
+        self.SetAcceleratorTable(accel_tbl)
+
+        # create the help menu
+        hmenu = wx.Menu()
+        hmi = wx.MenuItem(hmenu, wx.ID_ABOUT, 'About')
+        hmenu.AppendItem(hmi)
+        self.Bind(wx.EVT_MENU, self.OnAbout, hmi, wx.ID_ABOUT)
+
+        # create and fill in the mnu bar
+        mbar = wx.MenuBar()
+        mbar.Append(fmenu, '&File')
+        mbar.Append(hmenu, '&Help')
+
+        self.SetMenuBar(mbar)
+
     def InitUI(self):
         self.SetUpMenuBar()
         self.SetUpPanel()
         self.Show(True)
+
+
+################################################################
 
 def parse_options():
     parser = OptionParser(version='%prog ' + __version__,

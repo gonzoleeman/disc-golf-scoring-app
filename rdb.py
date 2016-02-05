@@ -50,11 +50,11 @@ class Player:
     def __init__(self, pnum, sname, lname):
         self.num = pnum
         self.name = sname
-        self.long_name = lname
+        self.full_name = lname
 
     def __str__(self):
         return "Player[%d]: %s (%s)" % \
-               (self.num, self.long_name, self.name)
+               (self.num, self.full_name, self.name)
 
 
 class Round:
@@ -79,15 +79,45 @@ class RoundDetail:
         self.round_num = int(rnum)
         self.player_num = int(pnum)
         self.fscore = None if fscore is None else int(fscore)
-        self.bscore = None if fscore is None else int(fscore)
+        self.bscore = None if bscore is None else int(bscore)
         self.acnt = acnt
         self.ecnt = ecnt
         # this is the CALCULATED *FLOATING POINT* score
-        self.score = float(score)
+        self.calc_score = float(score)
 
-    def __eq__(self, other):
-        return self.round_num == other.round_num and \
-               self.player_num == other.player_num
+#    def __eq__(self, other):
+#        dprint("Comparing EQUALity of %d/%d and %d/%d" % \
+#               (self.round_num, self.player_num,
+#                other.round_num, other.player_num))
+#        return self.round_num == other.round_num and \
+#               self.player_num == other.player_num
+
+    def __cmp__(self, other):
+        #dprint("__cmp__('%s', '%s')" % (self, other))
+        if self.round_num != other.round_num:
+            return self.round_num - other.round_num
+        if self.player_num != other.player_num:
+            return self.player_num - other.player_num
+        if self.fscore != other.fscore:
+            if self.fscore is None:
+                return other.fscore
+            if other.fscore is None:
+                return self.fscore
+            return self.fscore - other.fscore
+        if self.bscore != other.bscore:
+            if self.score is None:
+                return other.bscore
+            if other.bscore is None:
+                return self.bscore
+            return self.bscore - other.bscore
+        if self.acnt != other.acnt:
+            return self.acnt - other.acnt
+        if self.ecnt != other.ecnt:
+            return self.ecnt - other.ecnt
+        if self.calc_score != other.calc_score:
+            return self.calc_score - other.calc_score
+        #dprint("rounds match!!!")
+        return 0
 
     def SetScore(self, fscore, bscore):
         self.fscore = int(fscore)
@@ -101,7 +131,7 @@ class RoundDetail:
         return "RoundDetail[round=%d]: " % self.round_num + \
                "pnum=%d, score=%s/%s, a/e=%d/%d => %f" % \
                (self.player_num, self.fscore, self.bscore,
-                self.acnt, self.ecnt, self.score)
+                self.acnt, self.ecnt, self.calc_score)
 
 
 DB_DIR = 'db'
@@ -170,10 +200,10 @@ def init_rounds():
     RoundList = {}
     RoundNumberMax = 0
     for row in db_cmd_exec('SELECT * FROM rounds'):
-        (round_num, course_num, round_date) = row[0:3]
+        (round_num, course_num, rdate) = row[0:3]
         dprint("Adding round[%d]: course_num=%s, rnd_date=%s" % \
-               (round_num, course_num, round_date))
-        RoundList[round_num] = Round(round_num, course_num, round_date)
+               (round_num, course_num, rdate))
+        RoundList[round_num] = Round(round_num, course_num, rdate)
         if round_num > RoundNumberMax:
             RoundNumberMax = round_num
     dprint("Initializing Disc Golf Round Details ...")
@@ -181,12 +211,13 @@ def init_rounds():
     for row in db_cmd_exec('SELECT * from round_details'):
         (round_num, player_num, fscore, bscore, acnt, ecnt, score) = row[0:7]
         dprint("Adding round detail: " +
-               "rnd_num=%s, p_num=%s, " % (fscore, bscore) +
-               "fscore=%s, bscore=%s, " % (round_num, player_num) +
+               "rnd_num=%s, p_num=%s, " % (round_num, player_num) +
+               "fscore=%s, bscore=%s, " % (fscore, bscore) +
                "a/e-cnt=%s/%s, score=%s" % (acnt, ecnt, score))
         rd = RoundDetail(round_num, player_num, fscore, bscore,
                          acnt, ecnt, score)
         RoundDetailList.append(rd)
+        dprint("Added:", rd)
     dprint("Round Number max seen: %d" % RoundNumberMax)
 
 
@@ -221,34 +252,58 @@ def next_round_num():
 def add_round(rnd, rd_list):
     '''Add the specified round and list of round details to the DB'''
     dprint("Adding to DB:", rnd)
-    dprint("And rounds:")
     for rd in rd_list:
         dprint(rd)
-    db_cmd_exec('''INSERT INTO rounds(course_num, round_date)
+    db_cmd_exec('''INSERT INTO rounds(course_num, rdate)
                    VALUES(%d,"%s")''' % \
                 (rnd.course_num, rnd.rdate.strftime("%m/%d/%Y")))
     for rd in rd_list:
-        db_cmd_exec("INSERT INTO round_details " + \
-                    "VALUES(%d,%d,%d,%d,%d,%d,%f)" % \
-                    (rd.round_num, rd.player_num, rd.fscore, rd.bscore,
-                     rd.acnt, rd.ecnt, rd.score))
+        db_cmd_exec('''INSERT INTO round_details
+                       VALUES(%d,%d,%d,%d,%d,%d,%f)''' % \
+                    (rd.round_num, rd.player_num,
+                     rd.fscore, rd.bscore,
+                     rd.acnt, rd.ecnt,
+                     rd.calc_score))
 
 
 def modify_round(rnd, rd_list):
     '''Modify the specified round and list of round details in the DB'''
-    dprint("Modify Round: NOT YET IMPLEMENTED")
+    dprint("Adding to DB:", rnd)
+    for rd in rd_list:
+        dprint(rd)
+    for rd in rd_list:
+        dprint("Trying to update DB for:", rd)
+        db_cmd_exec('''UPDATE round_details
+                       SET fscore=%d,bscore=%d,
+                           acnt=%d,ecnt=%d,
+                           calc_score=%f
+                       WHERE round_num=%d AND player_num=%d''' % \
+                    (rd.fscore, rd.bscore,
+                     rd.acnt, rd.ecnt,
+                     rd.calc_score,
+                     rd.round_num, rd.player_num))
 
 def round_details_equal(rd_list1, rd_list2):
     dprint("comparing two round detail lists ...")
+    for rd in rd_list1:
+        dprint("rd_list1[]:", rd)
+    for rd in rd_list2:
+        dprint("rd_list2[]:", rd)
     rd_list1 = sorted(rd_list1, key=lambda rd: rd.player_num)
     rd_list2 = sorted(rd_list2, key=lambda rd: rd.player_num)
     if len(rd_list1) != len(rd_list2):
         dprint("lists have different lengths")
-        return True
-    for rd1, rd2 in it.izip(rd_list1, rd_list2):
-        dprint("Comparing:", rd1, ", ", rd2)
+        return False
+    idx = 0
+    max = len(rd_list1)
+    while idx < max:
+        rd1 = rd_list1[idx]
+        rd2 = rd_list2[idx]
+        dprint("Comparing:", rd1)
+        dprint("With:     ", rd2)
         if rd1 != rd2:
             dprint("items unequal", rd1, ", ", rd2)
-            return True
+            return False
+        idx += 1
     dprint("Item lists equals!")
-    return False
+    return True

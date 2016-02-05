@@ -34,8 +34,8 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
                             wxlc.TextEditMixin, wxlc.ColumnSorterMixin):
     def __init__(self, parent):
         wx.ListCtrl.__init__(self, parent, -1,
-                            style=wx.LC_REPORT|wx.LC_SINGLE_SEL,
-                             size=wx.Size(10,10))
+                             style=wx.LC_REPORT|wx.LC_SINGLE_SEL,
+                             size=wx.Size(10, 10))
         wxlc.ListCtrlAutoWidthMixin.__init__(self)
         self.num_re = re.compile('[+-]?[0-9]+$')
         self.Bind(wx.EVT_LIST_BEGIN_LABEL_EDIT, self.CheckEditBegin)
@@ -126,7 +126,7 @@ class AutoWidthListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
     def __init__(self, parent):
         wx.ListCtrl.__init__(self, parent, -1,
                              style=wx.LC_REPORT|wx.LC_SINGLE_SEL,
-                             size=wx.Size(10,10))
+                             size=wx.Size(10, 10))
         wxlc.ListCtrlAutoWidthMixin.__init__(self)
 
     def GetListCtrl(self):

@@ -4,17 +4,14 @@ Python script to present a Disc Golf GUI, that allows
 us to keep track of courses and holes on that course
 
 TO DO:
-    - When Examing a round, if you calcuate then cancel, the data
-      is still present!
+    - for creating a new round, and its "round number": quit
+      guessing what it will be, and actually add it to the database
 
-    - handle conflict when trying to add a new round, when
-      it is not unique (needed)
+    - use DB transactions for changes, so we can just update the DB, then
+      throw it away if they say "no"
 
-    - handle case when we calculate, and no values change, but
-      DB thinks it has been modified (optimization)
-
-    - use real fraction math to get fractions correct for "score"
-      (for accuracy)
+    - use real fractional math to get fractions correct for
+      "calculate_score" (for accuracy)
 
     - make setup window become the scoring window for a round,
       instead of just replacing one window with the next (optimization)
@@ -57,6 +54,7 @@ History:
         i.e. "Commit" not yet implemented
     version 1.7: add starting "round list" window
     versoin 1.8: all works but commit?
+    version 1.9: all works but getting result data!!!
 '''
 
 
@@ -77,7 +75,7 @@ import listctrl as lc
 
 
 __author__ = "Lee Duncan"
-__version__ = "1.8"
+__version__ = "1.9"
 
 
 class SetupRoundFrame(wx.Frame):
@@ -85,7 +83,7 @@ class SetupRoundFrame(wx.Frame):
         super(SetupRoundFrame, self).__init__(*args, **kwargs)
         self.SetSize((wx.Size(400, 400)))
         self.InitUI()
-        self.Bind(wx.EVT_CLOSE, self.OnQuit)
+        self.Bind(wx.EVT_CLOSE, self.Quit)
 
     def SetUpPanel(self):
         panel = wx.Panel(self, style=wx.SIMPLE_BORDER)
@@ -148,9 +146,10 @@ class SetupRoundFrame(wx.Frame):
         date_label = wx.StaticText(panel, label='Date')
         self.round_date = wx.DatePickerCtrl(panel, size=wx.Size(110, 20))
         self.score_button = wx.Button(panel, label='Score a Round')
-        self.Bind(wx.EVT_BUTTON, self.OnScoreARound,
+        self.Bind(wx.EVT_BUTTON, self.OnScoreRound,
                   source=self.score_button)
-        self.Bind(wx.EVT_BUTTON, self.OnQuit, source=cancel_button)
+        self.Bind(wx.EVT_BUTTON, self.Quit, source=cancel_button)
+        self.Bind(wx.EVT_DATE_CHANGED, self.DateChanged, source=self.round_date)
         self.score_button.Disable()
         vbox.AddSpacer(10)
         hbox3.Add(cancel_button)
@@ -162,7 +161,16 @@ class SetupRoundFrame(wx.Frame):
         hbox3.Add(self.score_button)
         vbox.Add(hbox3, flag=wx.LEFT|wx.RIGHT|wx.EXPAND, border=10)
         ################################################################
+        self.status_bar = self.CreateStatusBar()
+        self.status_bar.SetStatusText("Please choose")
+        self.status_bar.SetBackgroundColour(wx.NullColour)
+        ################################################################
         panel.SetSizer(vbox)
+
+    def DateChanged(self, e):
+        dprint("Date Changed!:", e)
+        self.status_bar.SetStatusText("")
+        self.status_bar.SetBackgroundColour(wx.NullColour)
 
     def SetScoreButtonState(self):
         '''Set appropriate state for the "Score" Button'''
@@ -184,13 +192,13 @@ class SetupRoundFrame(wx.Frame):
         dprint("Course[%d] Selected:" % e.Index, e)
         self.SetScoreButtonState()
 
-    def OnScoreARound(self, e):
-        dprint("*** 'Score' Button Pressed: players selected=%d:" % \
+    def OnScoreRound(self, e):
+        dprint("*** 'SCORE' Button Pressed: num players selected=%d:" % \
                self.player_list.item_check_count,
                self.player_list.items_checked)
         ################################################################
-        i = self.course_list.GetFirstSelected()
-        cnum = self.course_list.GetItemData(i)
+        idx = self.course_list.GetFirstSelected()
+        cnum = self.course_list.GetItemData(idx)
         dprint("Course number: %d" % cnum)
         wx_rdate = self.round_date.GetValue()
         dprint("Raw date:", wx_rdate)
@@ -201,8 +209,18 @@ class SetupRoundFrame(wx.Frame):
                (wx_rdate.GetYear(), wx_rdate.GetMonth() + 1, wx_rdate.GetDay()),
                rdate)
         ################################################################
-        this_round = rdb.Round(rdb.next_round_num(), cnum,
-                               rdate.strftime("%m/%d/%Y"))
+        # make sure this round does not already exist
+        rdate_str = rdate.strftime("%m/%d/%Y")
+        dprint("looking for dup round on date=%s, loc=%d)" % (rdate_str, cnum))
+        for rnd in rdb.RoundList.itervalues():
+            dprint("Looking at:", rnd)
+            if rnd.rdate == rdate:
+                dprint("Duplicate!?")
+                self.status_bar.SetStatusText("Duplicate Round Date!")
+                self.status_bar.SetBackgroundColour(wx.RED)
+                return
+        ################################################################
+        this_round = rdb.Round(rdb.next_round_num(), cnum, rdate_str)
         dprint("Created:", this_round)
         round_details = []
         for (k, v) in self.player_list.items_checked.iteritems():
@@ -221,7 +239,8 @@ class SetupRoundFrame(wx.Frame):
         srf.MyCreate(this_round, round_details, for_update=False)
         self.Destroy()
 
-    def OnQuit(self, e):
+    def Quit(self, e):
+        '''Either .... happened'''
         # XXX Do we need to check for database modified here, with a popup?
         dprint("QUITing SetupRoundFrame")
         self.Destroy()
@@ -234,7 +253,8 @@ class SetupRoundFrame(wx.Frame):
 
 class RoundScoreFrame(wx.Frame):
     '''
-    For Creating an entry for a new Round
+    For Creating a Round and some RoundDetails, or
+    for updating the RoundDetails for an existing round
     '''
     def __init__(self, *args, **kwargs):
         super(RoundScoreFrame, self).__init__(*args, **kwargs)
@@ -340,6 +360,7 @@ class RoundScoreFrame(wx.Frame):
         ################################################################
         self.status_bar = self.CreateStatusBar()
         self.status_bar.SetStatusText("Please fill in the scores")
+        self.status_bar.SetBackgroundColour(wx.NullColour)
 
     def OnCommit(self, e):
         dprint("OnCommit: string=%s" % e.GetString())
@@ -427,6 +448,9 @@ class RoundScoreFrame(wx.Frame):
             dprint("Message result:", res)
             if res == wx.NO:
                 return
+            # since our calculate has modifed the rdb data, we
+            # need to reload it :(
+            rdb.init_rounds()
         self.Close()
 
     def OnListEdited(self, evt):
@@ -555,8 +579,7 @@ class RoundsFrame(wx.Frame):
         self.SetRoundList()
         self.Show(True)
 
-    def OnQuit(self, e):
-        # XXX Do we need to check for database modified here, with a popup?
+    def Quit(self, e):
         dprint("QUITing RoundsFrame")
         self.Destroy()
 
@@ -600,7 +623,7 @@ Suite 330, Boston, MA  02111-1307  USA"""
 
         qmi = wx.MenuItem(fmenu, wx.ID_EXIT, '&Quit')
         fmenu.AppendItem(qmi)
-        self.Bind(wx.EVT_MENU, self.OnQuit, qmi, wx.ID_EXIT)
+        self.Bind(wx.EVT_MENU, self.Quit, qmi, wx.ID_EXIT)
 
         accel_tbl = wx.AcceleratorTable([\
                 (wx.ACCEL_CTRL, ord('Q'), wx.ID_EXIT),

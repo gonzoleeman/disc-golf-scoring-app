@@ -10,6 +10,7 @@ __version__ = "1.0"
 __author__ = "Lee Duncan"
 
 class Opts:
+    '''Command line Option tracking Class'''
     def __init__(self, debug=False):
         self.debug = debug
 

@@ -144,7 +144,6 @@ PlayerList = {}
 RoundList = {}
 # the detail list is not indexed by a number, so it's an array
 RoundDetailList = []
-RoundNumberMax = 0
 
 DBConn = None
 DBc = None
@@ -190,22 +189,28 @@ def init_players():
                                         player_full_name)
 
 
+def get_max_round_no():
+    global RoundList
+
+    # try it an alternative way
+    rnd_nos = [rnd.num for rnd in RoundList.itervalues()]
+    max_rnd_no = max(rnd_nos)
+    dprint("Max Round No: %d" % max_rnd_no)
+    return max_rnd_no
+
+
 def init_rounds():
     global DBc
     global RoundList
     global RoundDetailList
-    global RoundNumberMax
 
     dprint("Initializing Disc Golf Rounds ...")
     RoundList = {}
-    RoundNumberMax = 0
     for row in db_cmd_exec('SELECT * FROM rounds'):
         (round_num, course_num, rdate) = row[0:3]
         dprint("Adding round[%d]: course_num=%s, rnd_date=%s" % \
                (round_num, course_num, rdate))
         RoundList[round_num] = Round(round_num, course_num, rdate)
-        if round_num > RoundNumberMax:
-            RoundNumberMax = round_num
     dprint("Initializing Disc Golf Round Details ...")
     RoundDetailList = []
     for row in db_cmd_exec('SELECT * from round_details'):
@@ -218,7 +223,6 @@ def init_rounds():
                          acnt, ecnt, score)
         RoundDetailList.append(rd)
         dprint("Added:", rd)
-    dprint("Round Number max seen: %d" % RoundNumberMax)
 
 
 def init_db():
@@ -243,10 +247,8 @@ def commit_db():
 
 
 def next_round_num():
-    global RoundNumberMax
-
-    RoundNumberMax += 1
-    return RoundNumberMax
+    '''Return what the next round number will probably be'''
+    return get_max_round_no() + 1
 
 
 def add_round(rnd, rd_list):

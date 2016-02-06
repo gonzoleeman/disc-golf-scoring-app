@@ -46,7 +46,7 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
     def GetListCtrl(self):
         return self
 
-    def SetupListHdr(self, itemHdr, itemFmt, itemColumnFmt=None):
+    def SetupListHdr(self, itemHdr, itemFmt, itemColumnFmt):
         self.num_columns = len(itemHdr)
         wxlc.ColumnSorterMixin.__init__(self, self.num_columns)
         col_width = 100

@@ -4,8 +4,18 @@ Python script to present a Disc Golf GUI, that allows
 us to keep track of courses and holes on that course
 
 TO DO:
+    - Add in other fields into DB, e.g. Eagle-Ace, 9-s (win
+      a round), 18-s (win both rounds???), 33-s (got 33), $won,
+      and best from/back rounds
+
+    - Add an "All time" date range for the report screen
+    - display results as a graph?
+    
     - for creating a new round, and its "round number": quit
       guessing what it will be, and actually add it to the database
+
+    - use use the DB as the backend, with transactions, and never have to
+      keep local copies of data? (may be slow?)
 
     - use DB transactions for changes, so we can just update the DB, then
       throw it away if they say "no"
@@ -15,13 +25,10 @@ TO DO:
 
     - make setup window become the scoring window for a round,
       instead of just replacing one window with the next (optimization)
-
-    - implement looking at results (including graphing?) (needed)
-    - display results, e.g. year-to-date, custom-range?
-      (and what about a graph? woo hoo!)
+      (and likewise for the setup-report->report transition)
 
     - consider RETURN key in main window like Show/Edit button hit
-      (optimization)
+      (optimization) (i.e. Default?, Focus?)
 
     -------------------------------
 
@@ -55,6 +62,7 @@ History:
     version 1.7: add starting "round list" window
     versoin 1.8: all works but commit?
     version 1.9: all works but getting result data!!!
+    version 1.10: Now displays results, but no graph
 '''
 
 
@@ -75,7 +83,7 @@ import listctrl as lc
 
 
 __author__ = "Lee Duncan"
-__version__ = "1.9"
+__version__ = "1.10"
 
 
 class SetupRoundFrame(wx.Frame):
@@ -117,7 +125,6 @@ class SetupRoundFrame(wx.Frame):
         ################################################################
         hbox2.AddSpacer(15)
         self.course_list = lc.AutoWidthListCtrl(panel)
-        #self.course_list.InsertColumn(0, 'Choose a Course', width=100)
         self.course_list.SetupListHdr(['Choose a Course'],
                                       [wx.LIST_FORMAT_LEFT],
                                       ['%s'])
@@ -125,13 +132,6 @@ class SetupRoundFrame(wx.Frame):
         for k, c in rdb.CourseList.iteritems():
             item_data[k] = (c.name,)
         self.course_list.SetupListItems(item_data)
-        #cnt = 0
-        #for k in rdb.CourseList.iterkeys():
-        #    c = rdb.CourseList[k]
-        #    self.course_list.InsertStringItem(cnt, c.name)
-        #    self.course_list.SetItemData(cnt, k)
-        #    dprint("Inserted %s in list, index=%d" % (c, cnt))
-        #    cnt += 1
         hbox2.Add(self.course_list, 1, wx.EXPAND|wx.RIGHT, border=10)
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnCourseListSelected,
                   source=self.course_list,
@@ -241,7 +241,8 @@ class SetupRoundFrame(wx.Frame):
 
     def Quit(self, e):
         '''Either .... happened'''
-        # XXX Do we need to check for database modified here, with a popup?
+        # Do we need to check for database modified here, with a popup?
+        # (I do not think so)
         dprint("QUITing SetupRoundFrame")
         self.Destroy()
 
@@ -464,6 +465,221 @@ class RoundScoreFrame(wx.Frame):
         self.Show(True)
 
 
+class DisplayReportFrame(wx.Frame):
+    def __init__(self, *args, **kwargs):
+        super(DisplayReportFrame, self).__init__(*args, **kwargs)
+        self.SetSize((500, 250))
+
+    def MyStart(self, start_rdate, stop_rdate):
+        dprint("Report on reults from", start_rdate, "to", stop_rdate)
+        start_dt = dt.datetime(start_rdate.GetYear(),
+                               start_rdate.GetMonth() + 1,
+                               start_rdate.GetDay())
+        dprint("Report Starting Date (as datetime):", start_dt)
+        end_dt = dt.datetime(stop_rdate.GetYear(),
+                             stop_rdate.GetMonth() + 1,
+                             stop_rdate.GetDay())
+        dprint("Report Ending Date (as datetime):  ", end_dt)
+        matches_found = {k: rdb.SearchResult(v.num) \
+                         for k,v in rdb.PlayerList.iteritems()}
+        # make a dictionary of the entries in range:
+        for rd in rdb.RoundDetailList:
+            dprint("Looking at:", rd)
+            rnd = rdb.RoundList[rd.round_num]
+            dprint("From:      ", rnd)
+            if not (start_dt <= rnd.rdate <= end_dt):
+                continue
+            dprint("Found a match!")
+            matches_found[rd.player_num].AddResults(rd)
+        for pnum,sr in matches_found.iteritems():
+            dprint("Found match[%d]:" % pnum, sr)
+        # fill in data for our GUI list
+        self.item_data = {}
+        for pnum,sr in matches_found.iteritems():
+            if sr.rnd_cnt > 0:
+                pname = rdb.PlayerList[sr.pnum].name
+                self.item_data[pnum] = (pname, sr.rnd_cnt, sr.ttl_pts,
+                                        sr.PointsPerRound(),
+                                        sr.acnt, sr.ecnt)
+                dprint("Created data item:", self.item_data[pnum])
+        self.InitUI()
+
+    def SetUpPanel(self):
+        panel = wx.Panel(self, style=wx.SIMPLE_BORDER)
+        ################################################################
+        vbox = wx.BoxSizer(wx.VERTICAL)
+        ################################################################
+        vbox.AddSpacer(10)
+        big_font = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
+        big_font.SetPointSize(14)
+        hbox1 = wx.BoxSizer(wx.HORIZONTAL)
+        st1 = wx.StaticText(panel, label='Score Results')
+        st1.SetFont(big_font)
+        hbox1.Add(st1, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=10)
+        vbox.Add(hbox1, flag=wx.CENTER|wx.ALIGN_CENTER)
+        ################################################################
+        vbox.AddSpacer(10)
+        sl = wx.StaticLine(panel, size=wx.Size(400, 1))
+        vbox.Add(sl, flag=wx.CENTER|wx.ALIGN_CENTER)
+        ################################################################
+        vbox.AddSpacer(15)
+        hbox2 = wx.BoxSizer(wx.HORIZONTAL)
+        self.results_list = lc.AutoWidthListCtrl(panel)
+        self.results_list.SetupListHdr(\
+            ['Name', 'Rounds', 'TtlPts', 'PPR', 'Aces', 'Eagles'],
+            [wx.LIST_FORMAT_LEFT] + [wx.LIST_FORMAT_RIGHT] * 5,
+            ['%s', '%d', '%5.2f', '%5.2f', '%d', '%d'])
+        self.results_list.SetupListItems(self.item_data)
+        hbox2.Add(self.results_list, 1, wx.EXPAND|wx.ALL, border=10)
+        vbox.Add(hbox2, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
+        ################################################################
+        panel.SetSizer(vbox)
+
+    def Quit(self, e):
+        dprint("Quit? Really?")
+        self.Destroy()
+
+    def InitUI(self):
+        self.SetUpPanel()
+        self.Show(True)
+
+
+class ChooseReportRangeFrame(wx.Frame):
+    def __init__(self, *args, **kwargs):
+        super(ChooseReportRangeFrame, self).__init__(*args, **kwargs)
+        self.SetSize((350, 250))
+        self.InitUI()
+        self.Bind(wx.EVT_CLOSE, self.Quit)
+
+    def SetUpPanel(self):
+        panel = wx.Panel(self, style=wx.SIMPLE_BORDER)
+        ################################################################
+        vbox = wx.BoxSizer(wx.VERTICAL)
+        ################################################################
+        vbox.AddSpacer(10)
+        hbox1 = wx.BoxSizer(wx.HORIZONTAL)
+        big_font = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
+        big_font.SetPointSize(14)
+        st1 = wx.StaticText(panel, label='Report Setup')
+        st1.SetFont(big_font)
+        hbox1.Add(st1, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=10)
+        vbox.Add(hbox1, flag=wx.CENTER|wx.ALIGN_CENTER)
+        ################################################################
+        vbox.AddSpacer(10)
+        sl = wx.StaticLine(panel, size=wx.Size(400, 1))
+        vbox.Add(sl, flag=wx.CENTER|wx.ALIGN_CENTER)
+        ################################################################
+        hbox2 = wx.BoxSizer(wx.HORIZONTAL)
+        start_rdate_label = wx.StaticText(panel, label='Report Starting Date')
+        self.start_rdate = wx.DatePickerCtrl(panel, size=(110, 20))
+        vbox21 = wx.BoxSizer(wx.VERTICAL)
+        vbox21.Add(start_rdate_label, flag=wx.TOP, border=10)
+        vbox21.AddSpacer(5)
+        vbox21.Add(self.start_rdate, flag=wx.BOTTOM, border=10)
+        hbox2.Add(vbox21, flag=wx.LEFT)
+        hbox2.AddStretchSpacer(1)
+        stop_rdate_label = wx.StaticText(panel, label='Report Ending Date')
+        self.stop_rdate = wx.DatePickerCtrl(panel, size=(110, 20))
+        vbox22 = wx.BoxSizer(wx.VERTICAL)
+        vbox22.Add(stop_rdate_label, flag=wx.TOP, border=10)
+        vbox22.AddSpacer(5)
+        vbox22.Add(self.stop_rdate, flag=wx.BOTTOM, border=10)
+        hbox2.Add(vbox22, flag=wx.RIGHT)
+        ####
+        self.Bind(wx.EVT_DATE_CHANGED, self.DateChanged,
+                  source=self.start_rdate)
+        self.Bind(wx.EVT_DATE_CHANGED, self.DateChanged,
+                  source=self.stop_rdate)
+        ####
+        vbox.Add(hbox2, flag=wx.LEFT|wx.RIGHT|wx.EXPAND, border=10)
+        ################################################################
+        hbox3 = wx.BoxSizer(wx.HORIZONTAL)
+        st = wx.StaticText(panel, label='Precanned Ranges:')
+        date_range_choices = ['<Choose a Range>', 'YTD', 'Last Year']
+        self.cbox = wx.ComboBox(panel, id=wx.ID_ANY,
+                                value=date_range_choices[0],
+                                choices=date_range_choices,
+                                style=wx.CB_READONLY)
+        self.Bind(wx.EVT_COMBOBOX, self.DateRangeChoosen, source=self.cbox)
+        hbox3.Add(st)
+        hbox3.AddSpacer(5)
+        hbox3.Add(self.cbox)
+        vbox.Add(hbox3, flag=wx.LEFT|wx.RIGHT|wx.EXPAND, border=10)
+        ################################################################
+        self.results_button = wx.Button(panel, label='Show Results')
+        vbox.AddSpacer(20)
+        vbox.Add(self.results_button, flag=wx.CENTER|wx.ALIGN_CENTER,
+                 border=10)
+        self.results_button.Disable()
+        self.Bind(wx.EVT_BUTTON, self.ShowResults, source=self.results_button)
+        vbox.AddSpacer(20)
+        ################################################################
+        self.status_bar = self.CreateStatusBar()
+        self.status_bar.SetStatusText("Please choose a Date Range")
+        self.status_bar.SetBackgroundColour(wx.NullColour)
+        ################################################################
+        panel.SetSizer(vbox)
+
+    def DateChanged(self, e):
+        dprint("One of our dates has changed!", e)
+        if self.DateRangeValid():
+            self.results_button.Enable()
+            self.status_bar.SetStatusText("")
+            self.status_bar.SetBackgroundColour(wx.NullColour)
+        else:
+            self.results_button.Disable()
+
+    def DateRangeChoosen(self, e):
+        dprint("A pre-canned Date range has been choosen", e)
+        dprint("Choice String: %s" % e.GetString())
+        canned_choice = e.GetString()
+        if canned_choice == 'YTD':
+            dprint("Using 1/1/THISYEAR to NOW")
+            dt_end = wx.DateTime.Today()
+            dprint("Found end date (today) of:", dt_end)
+            dt_start = wx.DateTime()
+            dt_start.Set(1, 0, dt_end.GetYear())
+            dprint("Found end date (today) of:", dt_end)
+        elif canned_choice == 'Last Year':
+            dprint("Using 1/1/LASTYEAR to 12/31/LASTYEAR")
+            last_yr = wx.DateTime.Today().GetYear() - 1
+            dt_start = wx.DateTime()
+            dt_start.Set(1, 0, last_yr)
+            dt_end = wx.DateTime()
+            dt_end.Set(31, 11, last_yr)
+        else:
+            dprint("No valid choice")
+            return
+        dprint("Starting Date Range:", dt_start)
+        dprint("Stopping Date Range:", dt_end)
+        self.start_rdate.SetValue(dt_start)
+        self.stop_rdate.SetValue(dt_end)
+        self.DateChanged(e)
+
+    def DateRangeValid(self):
+        '''Is our date range valid?'''
+        rd_start = self.start_rdate.GetValue()
+        dprint("Date Range Valid: start=", rd_start)
+        rd_stop = self.stop_rdate.GetValue()
+        dprint("Date Range Valid: stop=", rd_stop)
+        return rd_stop > rd_start
+
+    def ShowResults(self, e):
+        dprint("Show Results, Damnit!", e)
+        df = DisplayReportFrame(self.GetParent(), title="Where's The Beef?")
+        df.MyStart(self.start_rdate.GetValue(),
+                   self.stop_rdate.GetValue())
+        self.Close()
+
+    def Quit(self, e):
+        dprint("Quit? Really?")
+        self.Destroy()
+
+    def InitUI(self):
+        self.SetUpPanel()
+        self.Show(True)
+
+
 class RoundsFrame(wx.Frame):
     def __init__(self, *args, **kwargs):
         super(RoundsFrame, self).__init__(*args, **kwargs)
@@ -540,11 +756,7 @@ class RoundsFrame(wx.Frame):
             item_data[c] = (rnd.rdate.strftime("%m/%d/%Y") ,
                             course_name,
                             str(player_cnt))
-        self.SetRounds(item_data)
-
-    def SetRounds(self, rnd_list):
-        dprint("Setting rounds list data for this frame")
-        self.round_list.SetupListItems(rnd_list)
+        self.round_list.SetupListItems(item_data)
 
     def OnListSelected(self, e):
         dprint("List Selected")
@@ -620,30 +832,36 @@ Suite 330, Boston, MA  02111-1307  USA"""
     def SetUpMenuBar(self):
         # create the 'File' menu and fill it in
         fmenu = wx.Menu()
-
         qmi = wx.MenuItem(fmenu, wx.ID_EXIT, '&Quit')
         fmenu.AppendItem(qmi)
         self.Bind(wx.EVT_MENU, self.Quit, qmi, wx.ID_EXIT)
-
-        accel_tbl = wx.AcceleratorTable([\
-                (wx.ACCEL_CTRL, ord('Q'), wx.ID_EXIT),
-                (wx.ACCEL_CTRL, ord('O'), wx.ID_OPEN),
-                (wx.ACCEL_CTRL, ord('S'), wx.ID_SAVE),
-                ])
-        self.SetAcceleratorTable(accel_tbl)
-
+        # create the reports menu
+        rmenu = wx.Menu()
+        rmi = wx.MenuItem(rmenu, wx.ID_VIEW_DETAILS, '&Display Report Window')
+        rmenu.AppendItem(rmi)
+        self.Bind(wx.EVT_MENU, self.Report, rmi, wx.ID_VIEW_DETAILS)
         # create the help menu
         hmenu = wx.Menu()
-        hmi = wx.MenuItem(hmenu, wx.ID_ABOUT, 'About')
+        hmi = wx.MenuItem(hmenu, wx.ID_ABOUT, '&About')
         hmenu.AppendItem(hmi)
         self.Bind(wx.EVT_MENU, self.OnAbout, hmi, wx.ID_ABOUT)
-
         # create and fill in the mnu bar
         mbar = wx.MenuBar()
         mbar.Append(fmenu, '&File')
+        mbar.Append(rmenu, '&Reports')
         mbar.Append(hmenu, '&Help')
-
         self.SetMenuBar(mbar)
+        # set shortcuts for menu CTRL-KEY combos ...
+        accel_tbl = wx.AcceleratorTable(
+            [(wx.ACCEL_CTRL, ord('X'), wx.ID_EXIT),
+             (wx.ACCEL_CTRL, ord('R'), wx.ID_VIEW_DETAILS),
+             (wx.ACCEL_CTRL, ord('A'), wx.ID_ABOUT)
+             ])
+        self.SetAcceleratorTable(accel_tbl)
+
+    def Report(self, e):
+        dprint("*** Report time!")
+        ChooseReportRangeFrame(self, title='Choose Report Date Range')
 
     def InitUI(self):
         self.SetUpMenuBar()

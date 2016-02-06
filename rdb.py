@@ -128,10 +128,39 @@ class RoundDetail:
         return self.fscore + self.bscore
 
     def __str__(self):
-        return "RoundDetail[round=%d]: " % self.round_num + \
-               "pnum=%d, score=%s/%s, a/e=%d/%d => %f" % \
+        return "RoundDetail[]: round_num=%d" % self.round_num + \
+               "player_num=%d, fscore=%s, bscore=%s, a/e=%d/%d => %f" % \
                (self.player_num, self.fscore, self.bscore,
                 self.acnt, self.ecnt, self.calc_score)
+
+class SearchResult:
+    '''
+    What each entry in the search results looks like
+    '''
+    def __init__(self, pnum):
+        dprint("Creating empty Search Result for pnum=%d" % pnum)
+        self.pnum = pnum
+        #self.pname = rdb.Players[self.pnum]
+        self.rnd_cnt = 0
+        self.ttl_pts = float(0)
+        self.acnt = 0
+        self.ecnt = 0
+
+    def AddResults(self, round_detail):
+        dprint("Adding in results for pnum=%d" % self.pnum)
+        if self.pnum != round_detail.player_num:
+            raise Exception("Internal Error: Player Number Mismatch")
+        self.rnd_cnt += 1
+        self.ttl_pts += round_detail.calc_score
+        self.acnt += round_detail.acnt
+        self.ecnt += round_detail.ecnt
+
+    def PointsPerRound(self):
+        return self.ttl_pts / self.rnd_cnt
+
+    def __str__(self):
+        return "SearchResult[pnum=%d]: rnd_cnt=%d, ttl_pts=%f, a/e=%d/%d" % \
+               (self.pnum, self.rnd_cnt, self.ttl_pts, self.acnt, self.ecnt)
 
 
 DB_DIR = 'db'

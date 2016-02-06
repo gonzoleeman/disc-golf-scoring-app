@@ -32,6 +32,12 @@ def d2s(f, d):
 
 class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
                             wxlc.TextEditMixin, wxlc.ColumnSorterMixin):
+    '''
+    A List mixin where:
+    * the last item in the list takes up all the remaining room,
+    * You can edit the fields, and
+    * You can sort the columns
+    '''
     def __init__(self, parent):
         wx.ListCtrl.__init__(self, parent, -1,
                              style=wx.LC_REPORT|wx.LC_SINGLE_SEL,
@@ -123,6 +129,11 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
 
 class AutoWidthListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
                         wxlc.ColumnSorterMixin):
+    '''
+    A List mixin where:
+    * the last item in the list takes up all the remaining room, and
+    * You can sort the columns
+    '''
     def __init__(self, parent):
         wx.ListCtrl.__init__(self, parent, -1,
                              style=wx.LC_REPORT|wx.LC_SINGLE_SEL,
@@ -150,12 +161,14 @@ class AutoWidthListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
         self.itemDataMap = item_data
         data_idx = 0
         for key, data in self.itemDataMap.items():
-            dprint("Width List: Filling in row %d with key=%d:" % \
-                   (data_idx, key), data)
             cfmt = self.itemColumnFmt[0]
+            dprint("Width List: Filling in col=0 row=%d, key=%d, fmt=%s:" % \
+                   (data_idx, key, cfmt), data)
             self.InsertStringItem(data_idx, d2s(cfmt, data[0]))
             for col_idx in range(1, self.num_columns):
                 cfmt = self.itemColumnFmt[col_idx]
+                dprint("Width List: Filling col=%d row=%d, key=%d, fmt=%s:" % \
+                   (col_idx, data_idx, key, cfmt), data[col_idx])
                 self.SetStringItem(data_idx, col_idx, d2s(cfmt, data[col_idx]))
             self.SetItemData(data_idx, key)
             data_idx += 1
@@ -163,6 +176,12 @@ class AutoWidthListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
 
 class AutoWidthCheckListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
                              wxlc.CheckListCtrlMixin, wxlc.ColumnSorterMixin):
+    '''
+    A List mixin where:
+    * the last item in the list takes up all the remaining room,
+    * Each item has a check box, and
+    * You can sort the columns
+    '''
     def __init__(self, parent):
         wx.ListCtrl.__init__(self, parent, -1,
                              style=wx.LC_REPORT|wx.CONTROL_CHECKED)

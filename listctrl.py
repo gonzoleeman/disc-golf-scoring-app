@@ -88,7 +88,7 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
     def CheckEditBegin(self, evt):
         dprint("*** Checking edit (begin):", evt)
         dprint("Should we edit col=%d, text=%s" % (evt.m_col, evt.Text))
-        if evt.m_col in (1, 2, 3, 4):
+        if evt.m_col in [1, 2, 4, 5]:
             dprint("ALLOWing edit of column %d" % evt.m_col)
             evt.Allow()
             self.before_edit = evt.Text
@@ -118,12 +118,12 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
         * Number uses up the whole string
         '''
         field_str = self.GetItem(row, col).GetText()
-        dprint("Found item[row=%d, col=%d] = '%s'" % (row, col, field_str))
+        #dprint("Found item[row=%d, col=%d] = '%s'" % (row, col, field_str))
         if not self.num_re.match(field_str):
             raise ArithmeticError(field_str, col)
 
         val = int(field_str)
-        dprint("Found a number: '%s' -> %d" % (field_str, val))
+        #dprint("Found a number: '%s' -> %d" % (field_str, val))
         return val
 
 

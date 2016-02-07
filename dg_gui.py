@@ -4,24 +4,24 @@ Python script to present a Disc Golf GUI, that allows
 us to keep track of courses and holes on that course
 
 TO DO:
-    - Add in other fields into DB, e.g. Eagle-Ace, 9-s (win
-      a round), 18-s (win both rounds???), 33-s (got 33), $won,
-      and best from/back rounds
+    - Add "Eagle-Act-Cnt" field (per round detail)
+    - Report on count of 9-s, 18-s, and 33-s in report
+
+    - report on best front and back rounds
+
+    - handle "E" as the number "0" (i.e. "even") for score fields,
+      and display "E" instead of "+0" (enhancement)
 
     - Add an "All time" date range for the report screen
     - display results as a graph?
     
-    - for creating a new round, and its "round number": quit
-      guessing what it will be, and actually add it to the database
+    - quit guessing what new round number will be, and actually let
+      the database decide
 
-    - use use the DB as the backend, with transactions, and never have to
-      keep local copies of data? (may be slow?)
-
+    - in general, use use the DB as the backend, with transactions,
+      and never have to keep local copies of data? (may be slow?)
     - use DB transactions for changes, so we can just update the DB, then
       throw it away if they say "no"
-
-    - use real fractional math to get fractions correct for
-      "calculate_score" (for accuracy)
 
     - make setup window become the scoring window for a round,
       instead of just replacing one window with the next (optimization)
@@ -63,6 +63,8 @@ History:
     versoin 1.8: all works but commit?
     version 1.9: all works but getting result data!!!
     version 1.10: Now displays results, but no graph
+    version 1.11: Total score now a fraction. Round scores displayed
+        as "+N", or "-N". Also, now displaying "overall" score
 '''
 
 
@@ -83,7 +85,7 @@ import listctrl as lc
 
 
 __author__ = "Lee Duncan"
-__version__ = "1.10"
+__version__ = "1.11"
 
 
 class SetupRoundFrame(wx.Frame):
@@ -231,7 +233,7 @@ class SetupRoundFrame(wx.Frame):
             dprint("Found player[%d] (from checklist):" % i, player)
             rd = rdb.RoundDetail(this_round.num, player.num)
             round_details.append(rd)
-            dprint("Created Round Detail:", rd)
+            dprint("Created:", rd)
         round_details = sorted(round_details, key=lambda rd: rd.player_num)
         ################################################################
         # popup a window to enter the scores for round then go away
@@ -259,7 +261,7 @@ class RoundScoreFrame(wx.Frame):
     '''
     def __init__(self, *args, **kwargs):
         super(RoundScoreFrame, self).__init__(*args, **kwargs)
-        self.SetSize(wx.Size(500, 300))
+        self.SetSize(wx.Size(700, 300))
         self.is_edited = False
         self.cnum = None
         self.rdate = None
@@ -320,16 +322,17 @@ class RoundScoreFrame(wx.Frame):
         ################################################################
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
         self.score_list = lc.AutoWidthListEditCtrl(panel)
-        self.score_list.SetupListHdr(['Name', 'Front 9', 'Back 9',
+        self.score_list.SetupListHdr(['Name', 'Front 9', 'Back 9', 'Overall',
                                       'Aces', 'Eagles', 'Score'],
                                      [wx.LIST_FORMAT_LEFT,
                                       wx.LIST_FORMAT_CENTER,
                                       wx.LIST_FORMAT_CENTER,
                                       wx.LIST_FORMAT_CENTER,
                                       wx.LIST_FORMAT_CENTER,
-                                      wx.LIST_FORMAT_RIGHT],
-                                     ['%s', '%d', '%d',
-                                      '%d', '%d', '%5.2f'])
+                                      wx.LIST_FORMAT_CENTER,
+                                      wx.LIST_FORMAT_CENTER],
+                                     ['%s', '%+d', '%+d', '%+d',
+                                      '%d', '%d', '%s'])
         item_data = self.RoundDetailsAsDict()
         self.score_list.SetupListItems(item_data)
         hbox3.Add(self.score_list, 1, wx.EXPAND|wx.ALL, border=10)
@@ -380,10 +383,10 @@ class RoundScoreFrame(wx.Frame):
         dprint("Making Round Details into dictionary ...")
         item_data = {}
         for rd in self.round_details:
-            dprint("Round Detail:", rd)
+            dprint(rd)
             player = rdb.PlayerList[rd.player_num]
             item_data[rd.player_num] = (player.name,
-                                        rd.fscore, rd.bscore,
+                                        rd.fscore, rd.bscore, rd.Overall(),
                                         rd.acnt, rd.ecnt,
                                         rd.calc_score)
         return item_data
@@ -395,12 +398,12 @@ class RoundScoreFrame(wx.Frame):
         for c in range(cnt):
             dprint("Looking for round_detail index %d" % c)
             round_detail = self.round_details[c]
-            dprint("Round Detail:", round_detail)
+            dprint(round_detail)
             pname = self.score_list.GetItemText(c)
             dprint("Item %d: %s" % (c, pname))
             c1 = self.score_list.GetItem(c, 1).GetText()
             c2 = self.score_list.GetItem(c, 2).GetText()
-            dprint("Score: c1=%s, c2=%s" % (c1, c2))
+            #dprint("Score: c1=%s, c2=%s" % (c1, c2))
             ################
             try:
                 f9 = self.score_list.GetFieldNumericValue(c, 1)
@@ -468,7 +471,7 @@ class RoundScoreFrame(wx.Frame):
 class DisplayReportFrame(wx.Frame):
     def __init__(self, *args, **kwargs):
         super(DisplayReportFrame, self).__init__(*args, **kwargs)
-        self.SetSize((500, 250))
+        self.SetSize((550, 250))
 
     def MyStart(self, start_rdate, stop_rdate):
         dprint("Report on reults from", start_rdate, "to", stop_rdate)

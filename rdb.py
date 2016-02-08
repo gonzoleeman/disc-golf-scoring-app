@@ -76,53 +76,68 @@ class RoundDetail:
     One entry for one person for one round (which is one course on one day)
     '''
     def __init__(self, rnum, pnum, fscore=None, bscore=None,
-                 acnt=0, ecnt=0, score=None):
+                 acnt=0, ecnt=0, aecnt=0,
+                 calc_fscore=None, calc_bscore=None, calc_oscore=None):
         self.round_num = int(rnum)
         self.player_num = int(pnum)
-        self.fscore = None if fscore is None else fscore
-        self.bscore = None if bscore is None else bscore
+        # these are the round score: front and back
+        # (we allow these to be "None", meaning "not yet filled in")
+        self.fscore = fscore
+        self.bscore = bscore
+        # ace, eagle, and ace-eagle counts
         self.acnt = acnt
         self.ecnt = ecnt
-        # this is the CALCULATED fractional score
-        self.calc_score = MyFraction() if score is None else score
-
-#    def __eq__(self, other):
-#        dprint("Comparing EQUALity of %d/%d and %d/%d" % \
-#               (self.round_num, self.player_num,
-#                other.round_num, other.player_num))
-#        return self.round_num == other.round_num and \
-#               self.player_num == other.player_num
+        self.aecnt = aecnt
+        # CALCULATED fractional scores for front, back, and overall
+        self.calc_fscore = MyFraction() if calc_fscore is None else calc_fscore
+        self.calc_bscore = MyFraction() if calc_bscore is None else calc_bscore
+        self.calc_oscore = MyFraction() if calc_oscore is None else calc_oscore
 
     def __cmp__(self, other):
         if self.round_num != other.round_num:
+            dprint("compare round detail: round_num NOT EQUAL")
             return self.round_num - other.round_num
         if self.player_num != other.player_num:
+            dprint("compare round detail: player_num NOT EQUAL")
             return self.player_num - other.player_num
-        if self.fscore != other.fscore:
-            if self.fscore is None:
-                return other.fscore
-            if other.fscore is None:
-                return self.fscore
-            return self.fscore - other.fscore
-        if self.bscore != other.bscore:
-            if self.score is None:
-                return other.bscore
-            if other.bscore is None:
-                return self.bscore
-            return self.bscore - other.bscore
-        if self.acnt != other.acnt:
-            return self.acnt - other.acnt
-        if self.ecnt != other.ecnt:
-            return self.ecnt - other.ecnt
-        if self.calc_score > other.calc_score:
-            return 1
-        if self.calc_score < other.calc_score:
-            return -1
+        for fname in ['fscore', 'bscore']:
+            s = getattr(self, fname)
+            o = getattr(other, fname)
+            if s != o:
+                if s is None:
+                    dprint("compare round detail: self.%s is None" % fname)
+                    return o
+                if o is None:
+                    dprint("compare round detail: other.%s is None" % fname )
+                    return s
+                dprint("compare round detail: %s NOT EQUAL" % fname)
+                return s - o
+        for fname in ['acnt', 'ecnt', 'aecnt']:
+            s = getattr(self, fname)
+            o = getattr(other, fname)
+            if s != o:
+                dprint("compare round detail: %s NOT EQUAL" % fname)
+                return s - o
+        for fname in ['calc_fscore', 'calc_bscore', 'calc_oscore']:
+            s = getattr(self, fname)
+            o = getattr(other, fname)
+            if s > o:
+                dprint("compare round detail: %s (s>o) NOT EQUAL" % fname)
+                return 1
+            if s < o:
+                dprint("compare round detail: %s (s<o) NOT EQUAL" % fname)
+                return -1
+        dprint("compare round detail: *** EQUAL ***")
         return 0
 
     def SetScore(self, fscore, bscore):
         self.fscore = int(fscore)
         self.bscore = int(bscore)
+
+    def SetCounts(self, acnt, ecnt, aecnt):
+        self.acnt = acnt
+        self.ecnt = ecnt
+        self.aecnt = aecnt
 
     def Overall(self):
         '''Return overall, assuming round has been scored'''
@@ -130,41 +145,91 @@ class RoundDetail:
             return None
         return self.fscore + self.bscore
 
+    def CalcScore(self):
+        '''The Total score: front+back+overall'''
+        res = self.calc_fscore + self.calc_bscore + self.calc_oscore
+        dprint("returning %s + %s + %s = %s" % \
+               (self.calc_fscore, self.calc_bscore, self.calc_oscore, res))
+        return res
+
+    def CalcFrontScore(self):
+        return self.calc_fscore
+
+    def CalcBackScore(self):
+        return self.calc_bscore
+
+    def CalcOverallScore(self):
+        return self.calc_oscore
+
+    def SetFrontCalcScore(self, score):
+        self.calc_fscore = score
+        dprint("Set front score to %s" % score)
+
+    def SetBackCalcScore(self, score):
+        self.calc_bscore = score
+        dprint("Set back score to %s" % score)
+
+    def SetOverallCalcScore(self, score):
+        self.calc_oscore = score
+        dprint("Set overall score to %s" % score)
+
     def __str__(self):
         return "RoundDetail[]: round_num=%d, " % self.round_num + \
-               "player_num=%d, fscore=%s, bscore=%s, a=%d, e=%d => %s" % \
-               (self.player_num, self.fscore, self.bscore,
-                self.acnt, self.ecnt,
-                self.calc_score)
+               "player_num=%d, fscore=%s, bscore=%s, " % \
+               (self.player_num, self.fscore, self.bscore) + \
+               "a/e/ae=%d/%d/%d => %s|%s|%s" % \
+               (self.acnt, self.ecnt, self.aecnt,
+                self.calc_fscore, self.calc_bscore, self.calc_oscore)
 
 class SearchResult:
     '''
-    What each entry in the search results looks like
+    Used to gather data about how each player did over a period of time.
+    
+    i.e. this is what each entry in the search results looks like
     '''
     def __init__(self, pnum):
         dprint("Creating empty Search Result for pnum=%d" % pnum)
         self.pnum = pnum
-        #self.pname = rdb.Players[self.pnum]
         self.rnd_cnt = 0
-        self.ttl_pts = MyFraction()
+        self.front_pts = MyFraction()
+        self.back_pts = MyFraction()
+        self.overall_pts = MyFraction()
         self.acnt = 0
         self.ecnt = 0
+        self.aecnt = 0
+        self.rounds_won = 0
+        self.overalls_won = 0
 
-    def AddResults(self, round_detail):
-        dprint("Adding in results for pnum=%d" % self.pnum)
-        if self.pnum != round_detail.player_num:
+    def TotalPoints(self):
+        return self.front_pts + self.back_pts + self.overall_pts
+
+    def AddResults(self, rd):
+        dprint("Adding in results for pnum=%d:" % self.pnum, rd)
+        if self.pnum != rd.player_num:
             raise Exception("Internal Error: Player Number Mismatch")
         self.rnd_cnt += 1
-        self.ttl_pts += round_detail.calc_score
-        self.acnt += round_detail.acnt
-        self.ecnt += round_detail.ecnt
+        self.front_pts += rd.calc_fscore
+        self.back_pts += rd.calc_fscore
+        self.overall_pts += rd.calc_oscore
+        self.acnt += rd.acnt
+        self.ecnt += rd.ecnt
+        self.aecnt += rd.aecnt
+        f9_won = (rd.calc_fscore == MyFraction(9))
+        b9_won = (rd.calc_bscore == MyFraction(9))
+        if f9_won and b9_won:
+            self.rounds_won += 2
+            self.overalls_won += 1
+        elif f9_won or b9_won:
+            self.rounds_won += 1
 
     def PointsPerRound(self):
-        return self.ttl_pts / self.rnd_cnt
+        return self.TotalPoints() / self.rnd_cnt
 
     def __str__(self):
-        return "SearchResult[pnum=%d]: rnd_cnt=%d, ttl_pts=%s, a/e=%d/%d" % \
-               (self.pnum, self.rnd_cnt, self.ttl_pts, self.acnt, self.ecnt)
+        return "SearchResult[pnum=%d]: rnd_cnt=%d, front/rear/overall-pts=%s/%s/%s, a/e/ae=%d/%d/%d" % \
+               (self.pnum, self.rnd_cnt,
+                self.front_pts, self.back_pts, self.overall_pts,
+                self.acnt, self.ecnt, self.aecnt)
 
 
 DB_DIR = 'db'
@@ -249,14 +314,23 @@ def init_rounds():
     for row in db_cmd_exec('SELECT * from round_details'):
         (round_num, player_num,
          fscore, bscore,
-         acnt, ecnt, score_num, score_den) = row[0:8]
+         acnt, ecnt, aecnt,
+         fscore_num, fscore_den,
+         bscore_num, bscore_den,
+         oscore_num, oscore_den) = row[0:13]
         dprint("Adding round detail: " +
-               "rnd_num=%s, p_num=%s, " % (round_num, player_num) +
-               "fscore=%s, bscore=%s, " % (fscore, bscore) +
-               "a/e-cnt=%s/%s, score=%d/%d" % \
-               (acnt, ecnt, score_num, score_den))
+               "rnd_num=%d, p_num=%d, " % (round_num, player_num) +
+               "fscore=%d, bscore=%d, " % (fscore, bscore) +
+               "a/e/ae=%d/%d/%d, score=%d/%d|%d/%d|%d/%d" % \
+               (acnt, ecnt, aecnt,
+                fscore_num, fscore_den,
+                bscore_num, bscore_den,
+                oscore_num, oscore_den))
         rd = RoundDetail(round_num, player_num, fscore, bscore,
-                         acnt, ecnt, MyFraction(score_num, score_den))
+                         acnt, ecnt, aecnt,
+                         MyFraction(fscore_num, fscore_den),
+                         MyFraction(bscore_num, bscore_den),
+                         MyFraction(oscore_num, oscore_den))
         RoundDetailList.append(rd)
         dprint("Added:", rd)
 
@@ -296,35 +370,50 @@ def add_round(rnd, rd_list):
                    VALUES(%d,"%s")''' % \
                 (rnd.course_num, rnd.rdate.strftime("%m/%d/%Y")))
     for rd in rd_list:
-        db_cmd_exec('''INSERT INTO round_details
-                       VALUES(%d,%d,%d,%d,%d,%d,%d,%d)''' % \
+        db_cmd_exec('''INSERT INTO round_details(round_num, player_num,
+                                                 fscore, bscore,
+                                                 acnt, ecnt, aecnt,
+                                                 calc_fscore_numerator,
+                                                 calc_fscore_denominator,
+                                                 calc_bscore_numerator,
+                                                 calc_bscore_denominator,
+                                                 calc_oscore_numerator,
+                                                 calc_oscore_denominator)
+                       VALUES(%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)''' % \
                     (rd.round_num, rd.player_num,
                      rd.fscore, rd.bscore,
-                     rd.acnt, rd.ecnt,
-                     rd.calc_score.numerator, rd.calc_score.denominator))
+                     rd.acnt, rd.ecnt, rd.eacnt,
+                     rd.calc_fscore.numerator, rd.calc_fscore.denominator,
+                     rd.calc_bscore.numerator, rd.calc_bscore.denominator,
+                     rd.calc_oscore.numerator, rd.calc_oscore.denominator))
 
 
 def modify_round(rnd, rd_list):
     '''Modify the specified round and list of round details in the DB'''
-    dprint("Adding to DB:", rnd)
+    dprint("Modifying in DB:", rnd)
     for rd in rd_list:
         dprint(rd)
     for rd in rd_list:
         dprint("Trying to update DB for:", rd)
         db_cmd_exec('''UPDATE round_details
                        SET fscore=%d,bscore=%d,
-                           acnt=%d,ecnt=%d,
-                           calc_score_numerator=%d,
-                           calc_score_denominator=%d
+                           acnt=%d,ecnt=%d,aecnt=%d,
+                           calc_fscore_numerator=%d,
+                           calc_fscore_denominator=%d,
+                           calc_bscore_numerator=%d,
+                           calc_bscore_denominator=%d,
+                           calc_oscore_numerator=%d,
+                           calc_oscore_denominator=%d
                        WHERE round_num=%d AND player_num=%d''' % \
                     (rd.fscore, rd.bscore,
-                     rd.acnt, rd.ecnt,
-                     rd.calc_score.numerator,
-                     rd.calc_score.denominator,
+                     rd.acnt, rd.ecnt, rd.aecnt,
+                     rd.calc_fscore.numerator, rd.calc_fscore.denominator,
+                     rd.calc_bscore.numerator, rd.calc_bscore.denominator,
+                     rd.calc_oscore.numerator, rd.calc_oscore.denominator,
                      rd.round_num, rd.player_num))
 
 def round_details_equal(rd_list1, rd_list2):
-    dprint("comparing two round detail lists ...")
+    dprint("comparing two round detail lists with %d items;" % len(rd_list1))
     for rd in rd_list1:
         dprint("rd_list1[]:", rd)
     for rd in rd_list2:
@@ -332,8 +421,7 @@ def round_details_equal(rd_list1, rd_list2):
     rd_list1 = sorted(rd_list1, key=lambda rd: rd.player_num)
     rd_list2 = sorted(rd_list2, key=lambda rd: rd.player_num)
     if len(rd_list1) != len(rd_list2):
-        dprint("lists have different lengths")
-        return False
+        raise Exception("Internal Error: Lists have different lengths")
     idx = 0
     max = len(rd_list1)
     while idx < max:
@@ -341,10 +429,8 @@ def round_details_equal(rd_list1, rd_list2):
         rd2 = rd_list2[idx]
         dprint("Comparing:", rd1)
         dprint("With:     ", rd2)
-        res = (rd1 != rd2)
-        dprint("Comparison result:", res)
         if rd1 != rd2:
-            dprint("items unequal", rd1, ", ", rd2)
+            dprint("Item lists unequal", rd1, ", ", rd2)
             return False
         idx += 1
     dprint("Item lists equals!")

@@ -4,8 +4,20 @@ Python script to present a Disc Golf GUI, that allows
 us to keep track of courses and holes on that course
 
 TO DO:
-    - Add "Eagle-Act-Cnt" field (per round detail)
-    - Report on count of 9-s, 18-s, and 33-s in report
+    - figure out true meaning of 9-s, 18-s, and 33-s
+
+    - Allow update of DB any time, but warn user that "calc is needed"
+      if they have updated a front or back 9 score
+
+    - Break status window into 2 parts: the first is the file
+      name of the database, and the 2nd is for error messages
+      (for which frame(s)?)
+
+    - Update status with number of matching round in the report window,
+      when setting a date range
+
+    - As soon as any field changed in the Scoring GUI, update
+      the status window to say "Edited"
 
     - report on best front and back rounds
 
@@ -65,6 +77,8 @@ History:
     version 1.10: Now displays results, but no graph
     version 1.11: Total score now a fraction. Round scores displayed
         as "+N", or "-N". Also, now displaying "overall" score
+    version 1.12: Now tracking front/rear/overall score separately, per
+        round played, for easier tracking of 9-s, 18-s, etc.
 '''
 
 
@@ -85,7 +99,7 @@ import listctrl as lc
 
 
 __author__ = "Lee Duncan"
-__version__ = "1.11"
+__version__ = "1.12"
 
 
 class SetupRoundFrame(wx.Frame):
@@ -269,6 +283,7 @@ class RoundScoreFrame(wx.Frame):
         self.this_round = None
         self.for_update = None
         self.round_details = None
+        self.calc_done = False
 
     def MyCreate(self, this_round, round_details, for_update=False):
         self.cnum = this_round.course_num
@@ -323,8 +338,9 @@ class RoundScoreFrame(wx.Frame):
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
         self.score_list = lc.AutoWidthListEditCtrl(panel)
         self.score_list.SetupListHdr(['Name', 'Front 9', 'Back 9', 'Overall',
-                                      'Aces', 'Eagles', 'Score'],
+                                      'Aces', 'Eagles', 'Ace-Eagles', 'Score'],
                                      [wx.LIST_FORMAT_LEFT,
+                                      wx.LIST_FORMAT_CENTER,
                                       wx.LIST_FORMAT_CENTER,
                                       wx.LIST_FORMAT_CENTER,
                                       wx.LIST_FORMAT_CENTER,
@@ -332,7 +348,7 @@ class RoundScoreFrame(wx.Frame):
                                       wx.LIST_FORMAT_CENTER,
                                       wx.LIST_FORMAT_CENTER],
                                      ['%s', '%+d', '%+d', '%+d',
-                                      '%d', '%d', '%s'])
+                                      '%d', '%d', '%d', '%s'])
         item_data = self.RoundDetailsAsDict()
         self.score_list.SetupListItems(item_data)
         hbox3.Add(self.score_list, 1, wx.EXPAND|wx.ALL, border=10)
@@ -349,6 +365,7 @@ class RoundScoreFrame(wx.Frame):
         self.calc_button = wx.Button(panel, id=wx.ID_SETUP,
                                           label='Calculate')
         #self.calc_button.Disable()
+        self.calc_done = False
         self.Bind(wx.EVT_BUTTON, self.OnCancel, source=cancel_button)
         self.Bind(wx.EVT_BUTTON, self.OnCommit, source=self.commit_button)
         self.Bind(wx.EVT_BUTTON, self.OnCalculate, source=self.calc_button)
@@ -368,7 +385,14 @@ class RoundScoreFrame(wx.Frame):
 
     def OnCommit(self, e):
         dprint("OnCommit: string=%s" % e.GetString())
-        dprint("%s DB requested -- hope you're sure")
+        dprint("%s DB requested -- hope you're sure" % e.GetString())
+        dprint("State: edited=%s, calc_done=%s" % \
+               (self.is_edited, self.calc_done))
+        if self.is_edited and not self.calc_done:
+            self.GetDataFromForm()
+        if not self.is_edited:
+            dprint("Huh????")
+            return
         if self.for_update:
             rdb.modify_round(self.this_round, self.round_details)
         else:
@@ -387,11 +411,12 @@ class RoundScoreFrame(wx.Frame):
             player = rdb.PlayerList[rd.player_num]
             item_data[rd.player_num] = (player.name,
                                         rd.fscore, rd.bscore, rd.Overall(),
-                                        rd.acnt, rd.ecnt,
-                                        rd.calc_score)
+                                        rd.acnt, rd.ecnt, rd.aecnt,
+                                        rd.CalcScore())
         return item_data
 
-    def OnCalculate(self, e):
+    def GetDataFromForm(self):
+        '''Get data from our list into our self.round_details'''
         # get data from list into
         cnt = self.score_list.GetItemCount()
         dprint("Our round detail list has %d items" % cnt)
@@ -401,10 +426,6 @@ class RoundScoreFrame(wx.Frame):
             dprint(round_detail)
             pname = self.score_list.GetItemText(c)
             dprint("Item %d: %s" % (c, pname))
-            c1 = self.score_list.GetItem(c, 1).GetText()
-            c2 = self.score_list.GetItem(c, 2).GetText()
-            #dprint("Score: c1=%s, c2=%s" % (c1, c2))
-            ################
             try:
                 f9 = self.score_list.GetFieldNumericValue(c, 1)
                 b9 = self.score_list.GetFieldNumericValue(c, 2)
@@ -418,10 +439,16 @@ class RoundScoreFrame(wx.Frame):
                 self.status_bar.SetBackgroundColour(wx.RED)
                 return
             self.round_details[c].SetScore(f9, b9)
-            dprint("Front Nine for player %s: %d" % (pname, f9))
-            dprint("Back Nine for player %s: %d" % (pname, b9))
+            dprint("Front/Back Nine for player %s: %d/%d" % (pname, f9, b9))
+            acnt = self.score_list.GetFieldNumericValue(c, 4)
+            ecnt = self.score_list.GetFieldNumericValue(c, 5)
+            aecnt = self.score_list.GetFieldNumericValue(c, 6)
+            self.round_details[c].SetCounts(acnt, ecnt, aecnt)
             self.status_bar.SetStatusText("")
             self.status_bar.SetBackgroundColour(wx.NullColour)
+
+    def OnCalculate(self, e):
+        self.GetDataFromForm()
         dprint("All fields OK! scoring ...")
         pre_scored_details = copy.deepcopy(self.round_details)
         scored_details = score.score_round(self.round_details)
@@ -430,18 +457,22 @@ class RoundScoreFrame(wx.Frame):
             dprint("pre-socred[]: ", rd)
         for rd in scored_details:
             dprint("post-socred[]:", rd)
-
-        self.is_edited = not rdb.round_details_equal(pre_scored_details,
-                                                     scored_details)
-        if self.is_edited:
+        # was it changed?
+        was_changed = not rdb.round_details_equal(pre_scored_details,
+                                                  scored_details)
+        # if it was changed, we need update the DB
+        if was_changed:
+            # set 'edited' in case it was not set before
+            self.is_edited = True
             dprint("List *WAS* edited: updating")
             self.round_details = scored_details
             item_data = self.RoundDetailsAsDict()
             self.score_list.SetupListItems(item_data)
-            #self.calc_button.Disable()
             self.commit_button.Enable()
         else:
-            dprint("List was /not/ edited, so no update to do :(")
+            # else already edited 
+            dprint("List was /not/ edited, so nothing to do?")
+        self.calc_done = True
 
     def OnCancel(self, e):
         dprint("Cancel!: Edited=%s" % self.is_edited)
@@ -458,9 +489,13 @@ class RoundScoreFrame(wx.Frame):
         self.Close()
 
     def OnListEdited(self, evt):
-        dprint("Our List has been Edited!!!")
-        #self.calc_button.Enable()
-        self.commit_button.Disable()
+        dprint("OnListEdited: Col=%d: %s", (evt.col, evt.message))
+        # was editing in the front9/back9 columns?
+        if evt.col in [1, 2]:
+            self.calc_button.Enable()
+            self.calc_done = False
+        # but any change means we need to save the changes
+        self.commit_button.Enable()
         self.is_edited = True
 
     def InitUI(self):
@@ -471,7 +506,7 @@ class RoundScoreFrame(wx.Frame):
 class DisplayReportFrame(wx.Frame):
     def __init__(self, *args, **kwargs):
         super(DisplayReportFrame, self).__init__(*args, **kwargs)
-        self.SetSize((550, 250))
+        self.SetSize((825, 250))
 
     def MyStart(self, start_rdate, stop_rdate):
         dprint("Report on reults from", start_rdate, "to", stop_rdate)
@@ -483,9 +518,9 @@ class DisplayReportFrame(wx.Frame):
                              stop_rdate.GetMonth() + 1,
                              stop_rdate.GetDay())
         dprint("Report Ending Date (as datetime):  ", end_dt)
+        # make a dictionary of the entries in range:
         matches_found = {k: rdb.SearchResult(v.num) \
                          for k,v in rdb.PlayerList.iteritems()}
-        # make a dictionary of the entries in range:
         for rd in rdb.RoundDetailList:
             dprint("Looking at:", rd)
             rnd = rdb.RoundList[rd.round_num]
@@ -501,9 +536,10 @@ class DisplayReportFrame(wx.Frame):
         for pnum,sr in matches_found.iteritems():
             if sr.rnd_cnt > 0:
                 pname = rdb.PlayerList[sr.pnum].name
-                self.item_data[pnum] = (pname, sr.rnd_cnt, sr.ttl_pts,
+                self.item_data[pnum] = (pname, sr.rnd_cnt, sr.TotalPoints(),
                                         sr.PointsPerRound(),
-                                        sr.acnt, sr.ecnt)
+                                        sr.acnt, sr.ecnt, sr.aecnt,
+                                        sr.rounds_won, 0, sr.overalls_won)
                 dprint("Created data item:", self.item_data[pnum])
         self.InitUI()
 
@@ -529,9 +565,13 @@ class DisplayReportFrame(wx.Frame):
         hbox2 = wx.BoxSizer(wx.HORIZONTAL)
         self.results_list = lc.AutoWidthListCtrl(panel)
         self.results_list.SetupListHdr(\
-            ['Name', 'Rounds', 'TtlPts', 'PPR', 'Aces', 'Eagles'],
-            [wx.LIST_FORMAT_LEFT] + [wx.LIST_FORMAT_RIGHT] * 5,
-            ['%s', '%d', '%5.2f', '%5.2f', '%d', '%d'])
+            ['Name', 'Rounds', 'TtlPts', 'PPR',
+             'Aces', 'Eagles', 'Ace-Eagles',
+             '9-s', '18-s', '33-s'],
+            [wx.LIST_FORMAT_LEFT, wx.LIST_FORMAT_CENTER,
+             wx.LIST_FORMAT_RIGHT, wx.LIST_FORMAT_RIGHT] + \
+            [wx.LIST_FORMAT_RIGHT] * 6,
+            ['%s', '%d', '%5.2f', '%5.2f'] + ['%d'] * 6)
         self.results_list.SetupListItems(self.item_data)
         hbox2.Add(self.results_list, 1, wx.EXPAND|wx.ALL, border=10)
         vbox.Add(hbox2, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)

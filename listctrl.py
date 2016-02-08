@@ -71,7 +71,6 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
         data_idx = 0
         # sort list by keys
         sorted_items = sorted(item_data.items(), key=operator.itemgetter(0))
-        #for key, data in self.itemDataMap.items():
         for (key, data) in sorted_items:
             dprint("Edit List: Filling in row %d with key=%d:" % \
                    (data_idx, key), data)
@@ -87,8 +86,8 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
 
     def CheckEditBegin(self, evt):
         dprint("*** Checking edit (begin):", evt)
-        dprint("Should we edit col=%d, text=%s" % (evt.m_col, evt.Text))
-        if evt.m_col in [1, 2, 4, 5]:
+        dprint("*** Should we edit col=%d, text=%s?" % (evt.m_col, evt.Text))
+        if evt.m_col in [1, 2, 4, 5, 6]:
             dprint("ALLOWing edit of column %d" % evt.m_col)
             evt.Allow()
             self.before_edit = evt.Text
@@ -97,14 +96,13 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
             evt.Veto()
 
     def CheckEditEnd(self, evt):
-        dprint("*** Checking edit (end):", evt)
-        dprint("Finished editing col=%d, text=%s" % (evt.m_col, evt.Text))
+        dprint("*** Finished editing col=%d, text=%s" % (evt.m_col, evt.Text))
         self.after_edit = evt.Text
         if self.before_edit != self.after_edit:
             dprint("Sending a a custom event: list edited!")
             new_evt = ListEditedEvt(self.GetId(),
                                     message='list edited',
-                                    col=evt.m_col, row=evt.m_item)
+                                    col=evt.m_col)
             wx.PostEvent(self.GetParent(), new_evt)
         # allow all edits -- XXX probably not needed
         evt.Allow()

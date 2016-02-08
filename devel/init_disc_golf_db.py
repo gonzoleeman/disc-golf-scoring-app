@@ -28,7 +28,7 @@ __version__ = "1.0"
 #
 # data for preloading the database
 #
-players = [
+players_preload_list = [
     # fields:
     # 1. num -- autoincrement
     # 2. name
@@ -47,57 +47,62 @@ players = [
     ("Bill", "Bill ???"),               # 12
     ]
 
-courses = [
+courses_preload_list = [
     # fields:
     # 1. num -- autoincrement
     # 2. course_name
-    ("Dick's",),
-    ("Charlie's",),
-    ("Bill's",),
-    ("Rick's",),
-    ("Pat's",),
+    ("Dick's",),                        # 1
+    ("Charlie's",),                     # 2
+    ("Bill's",),                        # 3
+    ("Rick's",),                        # 4
+    ("Pat's",),                         # 5
     ]
 
 
 #
 # optional (debugging) data for creating round info
 #
-rounds = [
+rounds_preload_list = [
     # fields:
     # 1. num -- autoincrement
     # 2. course_num (join from course.num)
     # 3. rdate
-    (1, "1/12/2016"),                   # Dick's: 8 players
-    (5, "1/19/2016"),                   # Pat's: 6 players
+    (1, "1/10/2016"),                   # Dick's
+    (5, "1/24/2016"),                   # Pat's
     ]
 
-round_details = [
+round_details_preload_list = [
     # fields:
     # round_num (join from rounds.num)
     #  player_num (join from player.num)
-    #   fscore
-    #    bscore
-    #     acnt
-    #      ecnt
-    #       calc_score_numerator
-    #        calc_score_denomiator
+    #   fscore					- front score over/under
+    #    bscore					- back score over/under
+    #     acnt					- ace count
+    #      ecnt					- eagle count
+    #       aecnt				- ace-eagle count
+    #        calc_fscore_numerator
+    #         calc_fscore_denomiator
+    #          calc_bscore_numerator
+    #           calc_bscore_denomiator
+    #            calc_oscore_numerator
+    #             calc_oscore_denomiator
     ################################################################
-    # for round 1: At Dicks's on 1/12/2016: 8 players
-    (1,  2, +1, +2, 1, 0,  1, 1),       # Pat
-    (1,  1, -1, -1, 0, 0, 12, 1),       # Gary
-    (1,  4, +1, +4, 0, 0,  5, 1),       # Dick
-    (1,  3, +2, +2, 0, 0,  1, 2),       # Charlie
-    (1, 12, +1,  0, 0, 0,  1, 2),       # Bill
-    (1, 11,  0,  0, 0, 0,  1, 2),       # Lee
-    (1,  7, +6, +4, 0, 0,  1, 2),       # John J
-    (1,  9, -1, +1, 0, 0,  1, 2),       # Jonathon
+    # for rouxsnd 1: At Dicks's on 1/12/2016: 8 players
+    (1,  2, +1, +2, 1, 0, 0,  1, 1, 0, 1, 0, 1), # Pat
+    (1,  1, -1, -1, 0, 0, 0, 12, 1, 0, 1, 0, 1), # Gary
+    (1,  4, +1, +4, 0, 0, 0,  5, 1, 0, 1, 0, 1), # Dick
+    (1,  3, +2, +2, 0, 0, 0,  1, 2, 0, 1, 0, 1), # Charlie
+    (1, 12, +1,  0, 0, 0, 0,  1, 2, 0, 1, 0, 1), # Bill
+    (1, 11,  0,  0, 0, 0, 0,  1, 2, 0, 1, 0, 1), # Lee
+    (1,  7, +6, +4, 0, 0, 0,  1, 2, 0, 1, 0, 1), # John J
+    (1,  9, -1, +1, 0, 0, 0,  1, 2, 0, 1, 0, 1), # Jonathon
     ################################################################
     # for round 2 - At Pat's on 1/19/2016: 6 players
-    (2,  2,  0, -3, 0, 0, 33, 1),       # Pat
-    (2,  4,  0, +1, 0, 0,  1, 4),       # Dick
-    (2,  3, +4, -1, 0, 0, 11, 1),       # Charlie
-    (2, 12, -2, -1, 0, 0,  4, 3),       # Bill
-    (2, 11, -2, -2, 0, 0,  5, 3),       # Lee
+    (2,  2,  0, -3, 0, 0, 0, 33, 1, 0, 1, 0, 1), # Pat
+    (2,  4,  0, +1, 0, 0, 0,  1, 4, 0, 1, 0, 1), # Dick
+    (2,  3, +4, -1, 0, 0, 0, 11, 1, 0, 1, 0, 1), # Charlie
+    (2, 12, -2, -1, 0, 0, 0,  4, 3, 0, 1, 0, 1), # Bill
+    (2, 11, -2, -2, 0, 0, 0,  5, 3, 0, 1, 0, 1), # Lee
     ]
 
 
@@ -108,54 +113,70 @@ def ensure_no_db():
     if os.path.isfile("%s/%s" % (_DB_DIR, _DB_FILE)):
         raise Exception("DB File already exists!")
 
+def db_cmd_exec(c, cmd):
+    dprint("sqlite3 cmd: %s" % cmd)
+    c.execute(cmd)
+
+def db_cmd_exec_many(c, cmd, data):
+    for d in data:
+        db_cmd_exec(c, cmd % d)
+
 def initialize_players(c):
-    global players
+    global players_preload_list
     
     dprint("Creating DB Table: 'players' ...")
-    c.execute('''CREATE TABLE players (
+    db_cmd_exec(c, '''CREATE TABLE players (
     			num INTEGER PRIMARY KEY AUTOINCREMENT,
     			name CHAR(20),
                         full_name CHAR(40))''')
     dprint("Initializing DB Table: 'players' ...")
-    c.executemany('''INSERT INTO players(name, full_name) VALUES(?,?)''',
-                  players)
+    db_cmd_exec_many(c, '''INSERT INTO players(name, full_name)
+                           VALUES(\"%s\",\"%s\")''',
+                     players_preload_list)
 
 def initialize_courses(c):
-    global courses
+    global courses_preload_list
 
     dprint("Creating DB Table: 'courses' ...")
-    c.execute('''CREATE TABLE courses (
+    db_cmd_exec(c, '''CREATE TABLE courses (
     				num INTEGER PRIMARY KEY AUTOINCREMENT,
     				name CHAR(20))''')
     dprint("Initializing DB Table: 'courses' ...")
-    c.executemany('''INSERT INTO courses(name) VALUES (?)''', courses)
+    db_cmd_exec_many(c, '''INSERT INTO courses(name) VALUES (\"%s\")''',
+                     courses_preload_list)
 
 def initialize_rounds(c):
-    global rounds
-    global round_details
+    global rounds_preload_list
+    global round_details_preload_list
 
     dprint("Creating DB Table: 'rounds' ...")
-    c.execute('''CREATE TABLE rounds (
-    				num INTEGER PRIMARY KEY AUTOINCREMENT,
-    				course_num INTEGER,
-                                rdate DATE)''')
-    c.execute('''CREATE TABLE round_details (
-    				round_num INTEGER,
-                                player_num INTEGER,
-                                fscore SMALLINT,
-                                bscore SMALLINT,
-                                acnt SMALLINT,
-                                ecnt SMALLINT,
-                                calc_score_numerator SMALLINT,
-                                calc_score_denominator SMALLINT,
-                                PRIMARY KEY (round_num, player_num))''')
+    db_cmd_exec(c, '''CREATE TABLE rounds (
+    				  num INTEGER PRIMARY KEY AUTOINCREMENT,
+    				  course_num INTEGER,
+                                  rdate DATE)''')
+    db_cmd_exec(c, '''CREATE TABLE round_details (
+    				  round_num INTEGER,
+                                  player_num INTEGER,
+                                  fscore SMALLINT,
+                                  bscore SMALLINT,
+                                  acnt SMALLINT,
+                                  ecnt SMALLINT,
+                                  aecnt SMALLINT,
+                                  calc_fscore_numerator SMALLINT,
+                                  calc_fscore_denominator SMALLINT,
+                                  calc_bscore_numerator SMALLINT,
+                                  calc_bscore_denominator SMALLINT,
+                                  calc_oscore_numerator SMALLINT,
+                                  calc_oscore_denominator SMALLINT,
+                                    PRIMARY KEY (round_num, player_num))''')
     dprint("Initializing DB Table: 'rounds' ...")
-    c.executemany(
-        '''INSERT INTO rounds(course_num, rdate) VALUES (?,?)''',
-        rounds)
+    db_cmd_exec_many(c, '''INSERT INTO rounds(course_num, rdate)
+                        VALUES (%d,\"%s\")''',
+                     rounds_preload_list)
     dprint("Initializing DB Table: 'round_details' ...")
-    c.executemany('''INSERT INTO round_details VALUES (?,?,?,?,?,?,?,?)''',
-                  round_details)
+    db_cmd_exec_many(c, '''INSERT INTO round_details
+                        VALUES (%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)''',
+                     round_details_preload_list)
 
 
 def initialize_db():

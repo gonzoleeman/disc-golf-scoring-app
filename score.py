@@ -15,7 +15,7 @@ OVERALL_SCORES = [15, 10, 5, 3, 2]
 
 def score_round(rd_list):
     '''
-    Given a list of round detail objects, return an updated round
+    Given a list of round detail objects, RETURN an updated round
     detail object list with scores filled in for the front9 round, the
     back9 round, andthe overall
     '''
@@ -23,49 +23,45 @@ def score_round(rd_list):
 
     # get sorted round lists
     front_list = sorted(rd_list, key=lambda rd: rd.fscore)
-    front_score_list = sorted([rnd.fscore for rnd in front_list])
+    front_score_list = sorted([rd.fscore for rd in front_list])
     front_score_results = calculate_score(front_score_list, ROUND_SCORES)
 
     # fill in front_list with front-9 totals
     back_list = sorted(rd_list, key=lambda rd: rd.bscore)
-    back_score_list = sorted([rnd.bscore for rnd in back_list])
+    back_score_list = sorted([rd.bscore for rd in back_list])
     back_score_results = calculate_score(back_score_list, ROUND_SCORES)
 
     # fill in back_list with back-9 totals
     ttl_list = sorted(rd_list, key=lambda rd: rd.Overall())
-    ttl_score_list = sorted([rnd.Overall() for rnd in ttl_list])
+    ttl_score_list = sorted([rd.Overall() for rd in ttl_list])
     ttl_score_results = calculate_score(ttl_score_list, OVERALL_SCORES)
 
     # fill in ttl_list with overall totals by adding all 3 lists
     dprint("score_round: *** 3-way Merge ***")
-    for rnd in rd_list:
-        dprint("Scoring for:", rnd)
+    for rd in rd_list:
+        dprint("Scoring for:", rd)
         idx = 0
-        for frnd in front_list:
-            dprint("Comparing against front round (idx=%d):" % idx, frnd)
-            if rnd == frnd:
+        for frd in front_list:
+            dprint("Comparing against front round (idx=%d):" % idx, frd)
+            if rd == frd:
                 break
             idx += 1
         # assume there *will* be a match
-        rnd.calc_score = front_score_results[idx]
-        dprint("Set Calc Score to:", rnd.calc_score)
-        dprint("From front score: ", front_score_results[idx])
+        rd.SetFrontCalcScore(front_score_results[idx])
         idx = 0
-        for brnd in back_list:
-            dprint("Comparing against back round (idx=%d):" % idx, brnd)
-            if rnd == brnd:
+        for brd in back_list:
+            dprint("Comparing against back round (idx=%d):" % idx, brd)
+            if rd == brd:
                 break
             idx += 1
-        rnd.calc_score += back_score_results[idx]
+        rd.SetBackCalcScore(back_score_results[idx])
         idx = 0
-        for trnd in ttl_list:
-            dprint("Comparing against ttl (idx=%d):" % idx, trnd)
-            if rnd == trnd:
+        for trd in ttl_list:
+            dprint("Comparing against ttl (idx=%d):" % idx, trd)
+            if rd == trd:
                 break
             idx += 1
-        rnd.calc_score += ttl_score_results[idx]
-        dprint("Score Detail:", rnd.calc_score)
-        dprint("Score for this round/player: %s" % rnd.calc_score)
+        rd.SetOverallCalcScore(ttl_score_results[idx])
 
     return rd_list
 
@@ -79,7 +75,7 @@ def calculate_score(score_list, score_values):
     Both input lists contain integers.
 
     Return a list of fractions that repesent the scores for
-    each player
+    each player, in the order of the score_list[] supplied.
     '''
     dprint("calculate_scores: score list:", score_list)
     dprint("                score_values:", score_values)
@@ -118,6 +114,7 @@ def calculate_score(score_list, score_values):
             dprint("ttl pts=%s" % val)
         score_each = MyFraction(val, num_at_place)
         for plc_idx in range(num_at_place):
+            dprint("Appending result[]: %s" % score_each)
             results.append(score_each)
         idx += num_at_place
 

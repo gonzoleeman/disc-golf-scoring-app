@@ -4,6 +4,17 @@ Python script to present a Disc Golf GUI, that allows
 us to keep track of courses and holes on that course
 
 TO DO:
+    - Update score results frame if a new "score" is done
+
+    - Keep track of Aces, Eagles, and Ace-Eagles on a per-hole basis,
+      e.g. have a drop-down radio-button list in the menu for each
+      of the 18 hole
+
+    - Add in tracking of 2 (or 3) money rounds: who won, on which of 6
+      max rounds, including Miss Kitty if no human won after 6 rounds
+
+    - Add option to backup the DB. (Periodically, or on demand?)
+
     - figure out true meaning of 9-s, 18-s, and 33-s
 
     - Allow update of DB any time, but warn user that "calc is needed"
@@ -95,6 +106,7 @@ from utils import dprint
 from opts import opts
 import score
 import listctrl as lc
+import money
 
 
 
@@ -251,7 +263,7 @@ class SetupRoundFrame(wx.Frame):
         round_details = sorted(round_details, key=lambda rd: rd.player_num)
         ################################################################
         # popup a window to enter the scores for round then go away
-        srf = RoundScoreFrame(self.GetParent(), title='Score a Round')
+        srf = RoundScoringFrame(self.GetParent(), title='Score a Round')
         srf.MyCreate(this_round, round_details, for_update=False)
         self.Destroy()
 
@@ -268,13 +280,13 @@ class SetupRoundFrame(wx.Frame):
         dprint("GUI Initialized")
 
 
-class RoundScoreFrame(wx.Frame):
+class RoundScoringFrame(wx.Frame):
     '''
     For Creating a Round and some RoundDetails, or
     for updating the RoundDetails for an existing round
     '''
     def __init__(self, *args, **kwargs):
-        super(RoundScoreFrame, self).__init__(*args, **kwargs)
+        super(RoundScoringFrame, self).__init__(*args, **kwargs)
         self.SetSize(wx.Size(700, 300))
         self.is_edited = False
         self.cnum = None
@@ -284,6 +296,7 @@ class RoundScoreFrame(wx.Frame):
         self.for_update = None
         self.round_details = None
         self.calc_done = False
+        self.Bind(wx.EVT_CLOSE, self.OnCancel)
 
     def MyCreate(self, this_round, round_details, for_update=False):
         self.cnum = this_round.course_num
@@ -316,7 +329,7 @@ class RoundScoreFrame(wx.Frame):
         sl = wx.StaticLine(panel, size=wx.Size(400, 1))
         vbox.Add(sl, flag=wx.CENTER|wx.ALIGN_CENTER)
         ################################################################
-        vbox.AddSpacer(10)
+        vbox.AddSpacer(20)
         hbox2 = wx.BoxSizer(wx.HORIZONTAL)
         bold_font = wx.SystemSettings_GetFont(wx.SYS_SYSTEM_FONT)
         bold_font.SetWeight(wx.FONTWEIGHT_BOLD)
@@ -334,6 +347,34 @@ class RoundScoreFrame(wx.Frame):
         hbox2.Add(st5)
         hbox2.AddSpacer(20)
         vbox.Add(hbox2, flag=wx.LEFT|wx.RIGHT|wx.EXPAND, border=10)
+        ################################################################
+        vbox.AddSpacer(15)
+        hbox2_5 = wx.BoxSizer(wx.HORIZONTAL)
+        st6 = wx.StaticText(panel, label='Money Rounds Results:')
+        st6.SetFont(bold_font)
+        choices = ['<None>'] + \
+                  [str(i) for i in range(18)] + \
+                  ['<MzKitty>']
+        st7 = wx.StaticText(panel, label='First:')
+        self.money_finish = []
+        self.money_finish.append(wx.Choice(panel, choices=choices))
+        st8 = wx.StaticText(panel, label='Second:')
+        self.money_finish.append(wx.Choice(panel, choices=choices))
+        st9 = wx.StaticText(panel, label='Third:')
+        self.money_finish.append(wx.Choice(panel, choices=choices))
+        hbox2_5.AddSpacer(20)
+        hbox2_5.Add(st6)
+        hbox2_5.AddSpacer(15)
+        hbox2_5.Add(st7)
+        hbox2_5.Add(self.money_finish[0])
+        hbox2_5.AddSpacer(15)
+        hbox2_5.Add(st8)
+        hbox2_5.Add(self.money_finish[1])
+        hbox2_5.AddSpacer(15)
+        hbox2_5.Add(st9)
+        hbox2_5.Add(self.money_finish[2])
+        vbox.Add(hbox2_5, flag=wx.LEFT|wx.RIGHT|wx.EXPAND, border=10)
+        vbox.AddSpacer(15)
         ################################################################
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
         self.score_list = lc.AutoWidthListEditCtrl(panel)
@@ -486,7 +527,7 @@ class RoundScoreFrame(wx.Frame):
             # since our calculate has modifed the rdb data, we
             # need to reload it :(
             rdb.init_rounds()
-        self.Close()
+        self.Destroy()
 
     def OnListEdited(self, evt):
         dprint("OnListEdited: Col=%d: %s", (evt.col, evt.message))
@@ -539,7 +580,9 @@ class DisplayReportFrame(wx.Frame):
                 self.item_data[pnum] = (pname, sr.rnd_cnt, sr.TotalPoints(),
                                         sr.PointsPerRound(),
                                         sr.acnt, sr.ecnt, sr.aecnt,
-                                        sr.rounds_won, 0, sr.overalls_won)
+                                        sr.won_9s, sr.won_18s,
+                                        sr.won_33s,
+                                        0, 0, 0)
                 dprint("Created data item:", self.item_data[pnum])
         self.InitUI()
 
@@ -567,11 +610,10 @@ class DisplayReportFrame(wx.Frame):
         self.results_list.SetupListHdr(\
             ['Name', 'Rounds', 'TtlPts', 'PPR',
              'Aces', 'Eagles', 'Ace-Eagles',
-             '9-s', '18-s', '33-s'],
-            [wx.LIST_FORMAT_LEFT, wx.LIST_FORMAT_CENTER,
-             wx.LIST_FORMAT_RIGHT, wx.LIST_FORMAT_RIGHT] + \
-            [wx.LIST_FORMAT_RIGHT] * 6,
-            ['%s', '%d', '%5.2f', '%5.2f'] + ['%d'] * 6)
+             '9-s', '18-s', '33-s', '$ Won', 'Best F9', 'Best B9'],
+            [wx.LIST_FORMAT_LEFT, wx.LIST_FORMAT_CENTER] + \
+            [wx.LIST_FORMAT_RIGHT] * 11,
+            ['%s', '%d', '%5.2f', '%5.2f'] + ['%d'] * 9)
         self.results_list.SetupListItems(self.item_data)
         hbox2.Add(self.results_list, 1, wx.EXPAND|wx.ALL, border=10)
         vbox.Add(hbox2, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
@@ -824,7 +866,7 @@ class RoundsFrame(wx.Frame):
             dprint("looking for round %d in:" % rnd.num, rd)
             if rnd.num == rd.round_num:
                 round_details.append(rd)
-        srf = RoundScoreFrame(self, title='Examine a Round')
+        srf = RoundScoringFrame(self, title='Examine a Round')
         srf.MyCreate(rnd, round_details, for_update=True)
 
     def OnNewRoundExists(self, message):

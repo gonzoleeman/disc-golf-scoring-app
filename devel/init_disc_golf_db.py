@@ -65,10 +65,13 @@ courses_preload_list = [
 rounds_preload_list = [
     # fields:
     # 1. num -- autoincrement
-    # 2. course_num (join from course.num)
-    # 3. rdate
-    (1, "1/10/2016"),                   # Dick's
-    (5, "1/24/2016"),                   # Pat's
+    # 2.  course_num (join from course.num)
+    # 3.   rdate
+    # 4.    mround1				- $ round 1 won on which pass?
+    # 5.     mround2				- $ round 2 won on which pass?
+    # 6.      mround3				- $ round 3 won on which pass?
+    (1, "1/10/2016", 1, 3, 0),          # Dick's
+    (5, "1/24/2016", 6, 4, 0),          # Pat's
     ]
 
 round_details_preload_list = [
@@ -86,23 +89,26 @@ round_details_preload_list = [
     #           calc_bscore_denomiator
     #            calc_oscore_numerator
     #             calc_oscore_denomiator
+    #              money_rnd1_winnings
+    #               money_rnd2_winnings
+    #                money_rnd3_winnings
     ################################################################
     # for rouxsnd 1: At Dicks's on 1/12/2016: 8 players
-    (1,  2, +1, +2, 1, 0, 0,  1, 1, 0, 1, 0, 1), # Pat
-    (1,  1, -1, -1, 0, 0, 0, 12, 1, 0, 1, 0, 1), # Gary
-    (1,  4, +1, +4, 0, 0, 0,  5, 1, 0, 1, 0, 1), # Dick
-    (1,  3, +2, +2, 0, 0, 0,  1, 2, 0, 1, 0, 1), # Charlie
-    (1, 12, +1,  0, 0, 0, 0,  1, 2, 0, 1, 0, 1), # Bill
-    (1, 11,  0,  0, 0, 0, 0,  1, 2, 0, 1, 0, 1), # Lee
-    (1,  7, +6, +4, 0, 0, 0,  1, 2, 0, 1, 0, 1), # John J
-    (1,  9, -1, +1, 0, 0, 0,  1, 2, 0, 1, 0, 1), # Jonathon
+    (1,  2, +1, +2, 1, 0, 0,  1, 1, 0, 1, 0, 1, 0, 0, 0), # Pat
+    (1,  1, -1, -1, 0, 0, 0, 12, 1, 0, 1, 0, 1, 0, 400, 0), # Gary
+    (1,  4, +1, +4, 0, 0, 0,  5, 1, 0, 1, 0, 1, 400, 400, 0), # Dick
+    (1,  3, +2, +2, 0, 0, 0,  1, 2, 0, 1, 0, 1, 400, 0, 0), # Charlie
+    (1, 12, +1,  0, 0, 0, 0,  1, 2, 0, 1, 0, 1, 0, 0, 0), # Bill
+    (1, 11,  0,  0, 0, 0, 0,  1, 2, 0, 1, 0, 1, 0, 0, 0), # Lee
+    (1,  7, +6, +4, 0, 0, 0,  1, 2, 0, 1, 0, 1, 0, 0, 0), # John J
+    (1,  9, -1, +1, 0, 0, 0,  1, 2, 0, 1, 0, 1, 0, 0, 0), # Jonathon
     ################################################################
     # for round 2 - At Pat's on 1/19/2016: 6 players
-    (2,  2,  0, -3, 0, 0, 0, 33, 1, 0, 1, 0, 1), # Pat
-    (2,  4,  0, +1, 0, 0, 0,  1, 4, 0, 1, 0, 1), # Dick
-    (2,  3, +4, -1, 0, 0, 0, 11, 1, 0, 1, 0, 1), # Charlie
-    (2, 12, -2, -1, 0, 0, 0,  4, 3, 0, 1, 0, 1), # Bill
-    (2, 11, -2, -2, 0, 0, 0,  5, 3, 0, 1, 0, 1), # Lee
+    (2,  2,  0, -3, 0, 0, 0, 33, 1, 0, 1, 0, 1, 500, 0, 0), # Pat
+    (2,  4,  0, +1, 0, 0, 0,  1, 4, 0, 1, 0, 1, 0, 0, 0), # Dick
+    (2,  3, +4, -1, 0, 0, 0, 11, 1, 0, 1, 0, 1, 0, 500, 0), # Charlie
+    (2, 12, -2, -1, 0, 0, 0,  4, 3, 0, 1, 0, 1, 0, 0, 0), # Bill
+    (2, 11, -2, -2, 0, 0, 0,  5, 3, 0, 1, 0, 1, 0, 0, 0), # Lee
     ]
 
 
@@ -153,7 +159,10 @@ def initialize_rounds(c):
     db_cmd_exec(c, '''CREATE TABLE rounds (
     				  num INTEGER PRIMARY KEY AUTOINCREMENT,
     				  course_num INTEGER,
-                                  rdate DATE)''')
+                                  rdate DATE,
+                                  mround1 SMALLINT,
+                                  mround2 SMALLINT,
+                                  mround3 SMALLINT)''')
     db_cmd_exec(c, '''CREATE TABLE round_details (
     				  round_num INTEGER,
                                   player_num INTEGER,
@@ -168,14 +177,21 @@ def initialize_rounds(c):
                                   calc_bscore_denominator SMALLINT,
                                   calc_oscore_numerator SMALLINT,
                                   calc_oscore_denominator SMALLINT,
+                                  money_rnd1_winnings SMALLINT,
+                                  money_rnd2_winnings SMALLINT,
+                                  money_rnd3_winnings SMALLINT,
                                     PRIMARY KEY (round_num, player_num))''')
     dprint("Initializing DB Table: 'rounds' ...")
-    db_cmd_exec_many(c, '''INSERT INTO rounds(course_num, rdate)
-                        VALUES (%d,\"%s\")''',
+    db_cmd_exec_many(c, '''INSERT INTO rounds(course_num,
+                                              rdate,
+                                              mround1,
+                                              mround2,
+                                              mround3)
+                        VALUES (%d,\"%s\",%d,%d,%d)''',
                      rounds_preload_list)
     dprint("Initializing DB Table: 'round_details' ...")
     db_cmd_exec_many(c, '''INSERT INTO round_details
-                        VALUES (%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)''',
+                    VALUES (%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)''',
                      round_details_preload_list)
 
 

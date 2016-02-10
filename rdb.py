@@ -197,8 +197,9 @@ class SearchResult:
         self.acnt = 0
         self.ecnt = 0
         self.aecnt = 0
-        self.rounds_won = 0
-        self.overalls_won = 0
+        self.won_9s = 0             # 9 pts for a front or back win
+        self.won_33s = 0           # 33 pts for front, back, and overall
+        self.won_18s = 0                # best overall score but not 33
 
     def TotalPoints(self):
         return self.front_pts + self.back_pts + self.overall_pts
@@ -214,13 +215,23 @@ class SearchResult:
         self.acnt += rd.acnt
         self.ecnt += rd.ecnt
         self.aecnt += rd.aecnt
-        f9_won = (rd.calc_fscore == MyFraction(9))
-        b9_won = (rd.calc_bscore == MyFraction(9))
-        if f9_won and b9_won:
-            self.rounds_won += 2
-            self.overalls_won += 1
-        elif f9_won or b9_won:
-            self.rounds_won += 1
+        dprint("Scoring results for front score: %s" % rd.calc_fscore)
+        if rd.calc_fscore == MyFraction(9):
+            dprint("Won a 9 (front)!")
+            self.won_9s += 1
+        dprint("Scoring results for front score: %s" % rd.calc_bscore)
+        if rd.calc_bscore == MyFraction(9):
+            dprint("Won a 9 (back)!")
+            self.won_9s += 1
+        dprint("Scoring results for overall score: %s" % rd.calc_oscore)
+        if rd.calc_oscore == MyFraction(15):
+            dprint("Won an 18!")
+            self.won_18s += 1
+        dprint("Scoring results for overall score: %s" % rd.CalcScore())
+        if rd.CalcScore() == MyFraction(33):
+            dprint("Won an 33!")
+            self.won_33s += 1
+            
 
     def PointsPerRound(self):
         return self.TotalPoints() / self.rnd_cnt

@@ -33,29 +33,29 @@ players_preload_list = [
     # 1. num -- autoincrement
     # 2. name
     # 3. full_name
-    ("Gary", "Gary Rogers"),		# 1
-    ("Pat", "Pat Olmstead"),	        # 2
-    ("Charlie", "Charlie Amacher"),     # 3
-    ("Dick", "Dick Burdock"),           # 4
-    ("Gabe", "Gabe Miller"),            # 5
-    ("Dr Dave", "Dr Dave"),             # 6
-    ("John J", "John J"),               # 7
-    ("John U", "John U"),               # 8
-    ("Jonathon", "Jonathon Williams"),  # 9
-    ("Rick", "Rick Miller"),            # 10
-    ("Lee", "Lee Duncan"),              # 11
-    ("Bill", "Bill ???"),               # 12
+    (1, "Gary", "Gary Rogers"),		# 1
+    (2, "Pat", "Pat Olmstead"),	        # 2
+    (3, "Charlie", "Charlie Amacher"),     # 3
+    (4, "Dick", "Dick Burdock"),           # 4
+    (5, "Gabe", "Gabe Miller"),            # 5
+    (6, "Dr Dave", "Dr Dave"),             # 6
+    (7, "John J", "John J"),               # 7
+    (8, "John U", "John U"),               # 8
+    (9, "Jonathon", "Jonathon Williams"),  # 9
+    (10, "Rick", "Rick Miller"),            # 10
+    (11, "Lee", "Lee Duncan"),              # 11
+    (12, "Bill", "Bill ???"),               # 12
     ]
 
 courses_preload_list = [
     # fields:
     # 1. num -- autoincrement
     # 2. course_name
-    ("Dick's",),                        # 1
-    ("Charlie's",),                     # 2
-    ("Bill's",),                        # 3
-    ("Rick's",),                        # 4
-    ("Pat's",),                         # 5
+    (1, "Dick's",),                        # 1
+    (2, "Charlie's",),                     # 2
+    (3, "Bill's",),                        # 3
+    (4, "Rick's",),                        # 4
+    (5, "Pat's",),                         # 5
     ]
 
 
@@ -70,8 +70,8 @@ rounds_preload_list = [
     # 4.    mround1				- $ round 1 won on which pass?
     # 5.     mround2				- $ round 2 won on which pass?
     # 6.      mround3				- $ round 3 won on which pass?
-    (1, "1/10/2016", 1, 3, 0),          # Dick's
-    (5, "1/24/2016", 6, 7, 0),          # Pat's
+    (1, 1, "1/10/2016", 1, 3, 0),          # Round 1: at Dick's
+    (2, 5, "1/24/2016", 6, 7, 0),          # Round 2: Pat's
     ]
 
 round_details_preload_list = [
@@ -136,8 +136,8 @@ def initialize_players(c):
     			name CHAR(20),
                         full_name CHAR(40))''')
     dprint("Initializing DB Table: 'players' ...")
-    db_cmd_exec_many(c, '''INSERT INTO players(name, full_name)
-                           VALUES(\"%s\",\"%s\")''',
+    db_cmd_exec_many(c, '''INSERT INTO players(num, name, full_name)
+                           VALUES(%d, \"%s\",\"%s\")''',
                      players_preload_list)
 
 def initialize_courses(c):
@@ -148,7 +148,8 @@ def initialize_courses(c):
     				num INTEGER PRIMARY KEY AUTOINCREMENT,
     				name CHAR(20))''')
     dprint("Initializing DB Table: 'courses' ...")
-    db_cmd_exec_many(c, '''INSERT INTO courses(name) VALUES (\"%s\")''',
+    db_cmd_exec_many(c, '''INSERT INTO courses(num, name)
+                           VALUES (%d, \"%s\")''',
                      courses_preload_list)
 
 def initialize_rounds(c):
@@ -182,12 +183,13 @@ def initialize_rounds(c):
                                   money_rnd3_winnings SMALLINT,
                                     PRIMARY KEY (round_num, player_num))''')
     dprint("Initializing DB Table: 'rounds' ...")
-    db_cmd_exec_many(c, '''INSERT INTO rounds(course_num,
+    db_cmd_exec_many(c, '''INSERT INTO rounds(num,
+                                              course_num,
                                               rdate,
                                               mround1,
                                               mround2,
                                               mround3)
-                        VALUES (%d,\"%s\",%d,%d,%d)''',
+                        VALUES (%d, %d,\"%s\",%d,%d,%d)''',
                      rounds_preload_list)
     dprint("Initializing DB Table: 'round_details' ...")
     db_cmd_exec_many(c, '''INSERT INTO round_details

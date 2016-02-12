@@ -64,7 +64,7 @@ class Round:
     One round, not counting the individual scores
     '''
     def __init__(self, rnum, cnum, rdate,
-                 mround1=None, mround2=None, mround3=None):
+                 mround1=0, mround2=0, mround3=0):
         self.num = int(rnum)
         self.course_num = int(cnum)
         self.rdate = parse_date(rdate)
@@ -445,13 +445,18 @@ def add_round(rnd, rd_list):
     dprint("Adding to DB:", rnd)
     for rd in rd_list:
         dprint(rd)
-    db_cmd_exec('''INSERT INTO rounds(course_num,rdate,mround1,mround2,mround3)
-                   VALUES(%d,"%s",%d,%d,%d)''' % \
-                (rnd.course_num, rnd.rdate.strftime("%m/%d/%Y"),
-                 rnd.mround1.AsCents(),
-                 rnd.mround2.AsCents(),
-                 rnd.mround3.AsCents()))
+    db_cmd_exec('''INSERT INTO rounds(num,
+                                      course_num,
+                                      rdate,
+                                      mround1,mround2,mround3)
+                   VALUES(%d,%d,"%s",%d,%d,%d)''' % \
+                (rnd.num,
+                 rnd.course_num,
+                 rnd.rdate.strftime("%m/%d/%Y"),
+                 rnd.mround1, rnd.mround2, rnd.mround3))
     for rd in rd_list:
+        if rnd.num != rd.round_num:
+            raise Exception("Internal Error: Round Number mismatch!")
         db_cmd_exec('''INSERT INTO round_details(round_num, player_num,
                                                  fscore, bscore,
                                                  acnt, ecnt, aecnt,

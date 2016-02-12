@@ -81,6 +81,6 @@ def money_from_string(money_str):
         c_str = '0'
     d = int(d_str) if len(d_str) else 0
     c = int(c_str) if len(c_str) else 0
-    dprint("Money: Split fields: '%s'.'%s'" % (d_str, c_str))
-    dprint("       Into:         '%d'.'%d'" % (d, c))
-    return Money(d, c)
+    res = Money(d, c)
+    dprint("Money string '%s' -> $%s" % (money_str, res))
+    return res

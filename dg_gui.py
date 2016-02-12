@@ -4,10 +4,13 @@ Python script to present a Disc Golf GUI, that allows
 us to keep track of courses and holes on that course
 
 TO DO:
-    - Update score results frame if a new "score" is done
-
     - Always show "Mz Kitty" on results, in case she won money?
       (or only if she won money?)
+
+    - Allow adjust the date and/or Location on a round (either new or
+      editing?)
+
+    - Sanity check; disallow new rounds in the future?
 
     - For counting 9-s, 18-s, and 33-s, what if, for example,
       somebody ties on the front 9. Do both folks get 9-s?
@@ -105,6 +108,10 @@ History:
     version 1.13: Many changes, including handling money rounds, and
         displaying money won and best front and rear rounds. Also added
         new date ranges for reports
+    version 1.14:
+        * update report window if round(s) updated
+        * cleaned up money parsing debugging
+        * cleaned up money reporting bugs
 '''
 
 
@@ -128,12 +135,12 @@ import wxdate
 
 
 __author__ = "Lee Duncan"
-__version__ = "1.13"
+__version__ = "1.14"
 
 
-class SetupRoundFrame(wx.Frame):
+class RoundSetupFrame(wx.Frame):
     def __init__(self, *args, **kwargs):
-        super(SetupRoundFrame, self).__init__(*args, **kwargs)
+        super(RoundSetupFrame, self).__init__(*args, **kwargs)
         self.SetSize((wx.Size(400, 400)))
         self.InitUI()
         self.Bind(wx.EVT_CLOSE, self.Quit)
@@ -181,9 +188,9 @@ class SetupRoundFrame(wx.Frame):
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.OnCourseListSelected,
                   source=self.course_list,
                   id=wx.ID_ANY)
-        #self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.OnCourseListSelected,
-        #          source=self.course_list,
-        #          id=wx.ID_ANY)
+        self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.OnCourseListSelected,
+                  source=self.course_list,
+                  id=wx.ID_ANY)
         vbox.Add(hbox2, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
         ################################################################
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
@@ -294,7 +301,7 @@ class SetupRoundFrame(wx.Frame):
         '''Either .... happened'''
         # Do we need to check for database modified here, with a popup?
         # (I do not think so)
-        dprint("QUITing SetupRoundFrame")
+        dprint("QUITing RoundSetupFrame")
         self.Destroy()
 
     def InitUI(self):
@@ -380,22 +387,22 @@ class RoundScoringFrame(wx.Frame):
                   [str(i) for i in range(1,7)] + \
                   ['<MzKitty>']
         dprint("==> Setting up round choices, this_round:", self.this_round)
-        dprint("    to: 1st=%d, 2nd=%d, 3rd=%d" % \
+        dprint("    to: 1st=%s, 2nd=%s, 3rd=%s" % \
                (self.this_round.mround1,
                 self.this_round.mround2,
                 self.this_round.mround3))
         st7 = wx.StaticText(panel, label='First:')
         self.mf1 = wx.Choice(panel, choices=choices, id=1)
         self.mf1.Select(self.this_round.mround1)
-        self.mf1.Enable(self.this_round.mround1 > 0)
+        #self.mf1.Enable(self.this_round.mround1 > 0)
         st8 = wx.StaticText(panel, label='Second:')
         self.mf2 = wx.Choice(panel, choices=choices, id=2)
         self.mf2.Select(self.this_round.mround2)
-        self.mf2.Enable(self.this_round.mround2 > 0)
+        self.mf2.Enable(self.this_round.mround1 > 0)
         st9 = wx.StaticText(panel, label='Third:')
         self.mf3 = wx.Choice(panel, choices=choices, id=3)
         self.mf3.Select(self.this_round.mround3)
-        self.mf3.Enable(self.this_round.mround3 > 0)
+        self.mf3.Enable(self.this_round.mround2 > 0)
         self.Bind(wx.EVT_CHOICE, self.OnMoneyRound, source=self.mf1)
         self.Bind(wx.EVT_CHOICE, self.OnMoneyRound, source=self.mf2)
         self.Bind(wx.EVT_CHOICE, self.OnMoneyRound, source=self.mf3)
@@ -696,40 +703,10 @@ class ScoreResultsFrame(wx.Frame):
         self.SetSize((1100, 250))
 
     def MyStart(self, start_rdate, stop_rdate):
+        self.start_rdate = start_rdate
+        self.stop_rdate = stop_rdate
         dprint("Report on reults from", start_rdate, "to", stop_rdate)
-        start_dt = dt.datetime(start_rdate.GetYear(),
-                               start_rdate.GetMonth() + 1,
-                               start_rdate.GetDay())
-        dprint("Report Starting Date (as datetime):", start_dt)
-        end_dt = dt.datetime(stop_rdate.GetYear(),
-                             stop_rdate.GetMonth() + 1,
-                             stop_rdate.GetDay())
-        dprint("Report Ending Date (as datetime):  ", end_dt)
-        # make a dictionary of the entries in range:
-        matches_found = {k: rdb.SearchResult(v.num) \
-                         for k,v in rdb.PlayerList.iteritems()}
-        for rd in rdb.RoundDetailList:
-            dprint("Looking at:", rd)
-            rnd = rdb.RoundList[rd.round_num]
-            dprint("From:      ", rnd)
-            if not (start_dt <= rnd.rdate <= end_dt):
-                continue
-            dprint("Found a match!")
-            matches_found[rd.player_num].AddResults(rd)
-        # fill in data for our GUI list
-        self.item_data = {}
-        for pnum,sr in matches_found.iteritems():
-            dprint("Found match[%d]:" % pnum, sr)
-            if sr.rnd_cnt > 0:
-                pname = rdb.PlayerList[sr.pnum].name
-                self.item_data[pnum] = (pname, sr.rnd_cnt, sr.TotalPoints(),
-                                        sr.PointsPerRound(),
-                                        sr.acnt, sr.ecnt, sr.aecnt,
-                                        sr.won_9s, sr.won_18s,
-                                        sr.won_33s,
-                                        sr.best_fscore, sr.best_bscore,
-                                        sr.money_won)
-                dprint("Created data item:", self.item_data[pnum])
+        self.GenerateResultsList(start_rdate, stop_rdate)
         self.InitUI()
 
     def SetUpPanel(self):
@@ -761,11 +738,65 @@ class ScoreResultsFrame(wx.Frame):
             [wx.LIST_FORMAT_RIGHT] * 10 + [wx.LIST_FORMAT_CENTER],
             ['%s', '%d', '%5.2f', '%5.2f'] + \
             ['%d'] * 6 + ['%+d'] * 2 + ['$%s'])
+        # set up list based on previously-generated report data
         self.results_list.SetupListItems(self.item_data)
         hbox2.Add(self.results_list, 1, wx.EXPAND|wx.ALL, border=10)
         vbox.Add(hbox2, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
         ################################################################
         panel.SetSizer(vbox)
+        ################################################################
+        pub.subscribe(self.OnNewRoundExists, "ROUND UPDATE")
+
+    def OnNewRoundExists(self, message):
+        '''A "NEW ROUND" message has been received'''
+        dprint("ScoreResultsFrame: A 'NEW ROUND' Message we received!")
+        # re-read the database rounds and round_details into our
+        # internal structures, since they have changed
+        rdb.init_rounds()
+        # re-generate our report results and data, then display them
+        self.GenerateResultsList(self.start_rdate, self.stop_rdate)
+        self.results_list.SetupListItems(self.item_data)
+        self.Show(True)
+
+    def GenerateResultsList(self, start_rdate, stop_rdate):
+        '''Set up our report list items base on current data'''
+        dprint("***SetResultsList: Generating report for dates from:", \
+               start_rdate, ", to:", stop_rdate)
+        start_dt = dt.datetime(start_rdate.GetYear(),
+                               start_rdate.GetMonth() + 1,
+                               start_rdate.GetDay())
+        end_dt = dt.datetime(stop_rdate.GetYear(),
+                             stop_rdate.GetMonth() + 1,
+                             stop_rdate.GetDay())
+        dprint("Report Starting Date (as datetime):", start_dt)
+        dprint("Report Ending Date (as datetime):  ", end_dt)
+
+        # make a dictionary of the entries in range
+        matches_found = {k: rdb.SearchResult(v.num) \
+                         for k,v in rdb.PlayerList.iteritems()}
+        for rd in rdb.RoundDetailList:
+            dprint("Looking at:", rd)
+            rnd = rdb.RoundList[rd.round_num]
+            dprint("From:      ", rnd)
+            if not (start_dt <= rnd.rdate <= end_dt):
+                continue
+            dprint("Found a match!")
+            matches_found[rd.player_num].AddResults(rd)
+
+        # fill in data for our GUI list
+        self.item_data = {}
+        for pnum,sr in matches_found.iteritems():
+            dprint("Found match[%d]:" % pnum, sr)
+            if sr.rnd_cnt > 0:
+                pname = rdb.PlayerList[sr.pnum].name
+                self.item_data[pnum] = (pname, sr.rnd_cnt, sr.TotalPoints(),
+                                        sr.PointsPerRound(),
+                                        sr.acnt, sr.ecnt, sr.aecnt,
+                                        sr.won_9s, sr.won_18s,
+                                        sr.won_33s,
+                                        sr.best_fscore, sr.best_bscore,
+                                        sr.money_won)
+                dprint("Created data item:", self.item_data[pnum])
 
     def Quit(self, e):
         dprint("Quit? Really?")
@@ -776,9 +807,9 @@ class ScoreResultsFrame(wx.Frame):
         self.Show(True)
 
 
-class ChooseReportRangeFrame(wx.Frame):
+class ReportSetupFrame(wx.Frame):
     def __init__(self, *args, **kwargs):
-        super(ChooseReportRangeFrame, self).__init__(*args, **kwargs)
+        super(ReportSetupFrame, self).__init__(*args, **kwargs)
         self.SetSize((350, 250))
         self.InitUI()
         self.Bind(wx.EVT_CLOSE, self.Quit)
@@ -906,12 +937,11 @@ class ChooseReportRangeFrame(wx.Frame):
         self.Show(True)
 
 
-class RoundsFrame(wx.Frame):
+class CurrentRoundsFrame(wx.Frame):
     def __init__(self, *args, **kwargs):
-        super(RoundsFrame, self).__init__(*args, **kwargs)
+        super(CurrentRoundsFrame, self).__init__(*args, **kwargs)
         self.SetSize(wx.Size(300, 300))
         self.InitUI()
-        pub.subscribe(self.OnNewRoundExists, "ROUND UPDATE")
 
     def SetUpPanel(self):
         panel = wx.Panel(self, style=wx.SIMPLE_BORDER)
@@ -966,8 +996,10 @@ class RoundsFrame(wx.Frame):
         ################################################################
         panel.SetSizer(vbox)
         ################################################################
+        pub.subscribe(self.OnNewRoundExists, "ROUND UPDATE")
 
     def SetRoundList(self):
+        '''Set up our rounds list items based on current round data'''
         dprint("Setting Round List for this frame")
         item_data = {}
         for c, rnd in rdb.RoundList.iteritems():
@@ -995,7 +1027,7 @@ class RoundsFrame(wx.Frame):
 
     def OnNewRound(self, e):
         dprint("*** New Round!")
-        SetupRoundFrame(self, title='Setup a New Round')
+        RoundSetupFrame(self, title='Setup a New Round')
 
     def OnShow(self, e):
         '''show an existing round'''
@@ -1019,7 +1051,7 @@ class RoundsFrame(wx.Frame):
         self.Show(True)
 
     def Quit(self, e):
-        dprint("QUITing RoundsFrame")
+        dprint("QUITing CurrentRoundsFrame")
         self.Destroy()
 
     def OnAbout(self, e):
@@ -1088,7 +1120,7 @@ Suite 330, Boston, MA  02111-1307  USA"""
 
     def Report(self, e):
         dprint("*** Report time!")
-        ChooseReportRangeFrame(self, title='Choose Report Date Range')
+        ReportSetupFrame(self, title='Choose Report Date Range')
 
     def InitUI(self):
         self.SetUpMenuBar()
@@ -1112,7 +1144,7 @@ def main():
     parse_options()
     rdb.init_db()
     app = wx.App()
-    RoundsFrame(None, title='DGDB: The Disc Golf Database')
+    CurrentRoundsFrame(None, title='DGDB: The Disc Golf Database')
     app.MainLoop()
 
 

@@ -28,6 +28,7 @@ from dateutil.parser import parse as parse_date
 import datetime as dt
 import itertools as it
 from myfraction import MyFraction
+from money import Money
 
 from utils import dprint
 from opts import opts
@@ -62,14 +63,25 @@ class Round:
     '''
     One round, not counting the individual scores
     '''
-    def __init__(self, rnum, cnum, rdate):
+    def __init__(self, rnum, cnum, rdate,
+                 mround1=None, mround2=None, mround3=None):
         self.num = int(rnum)
         self.course_num = int(cnum)
         self.rdate = parse_date(rdate)
+        # what try it took for an ace (0 -> none, 7 -> mzKitty)
+        self.mround1 = mround1
+        self.mround2 = mround2
+        self.mround3 = mround3
+
+    def __repr__(self):
+        return "Round(%d, %d, %s, %d, %d, %d)" % \
+               (self.num, self.course_num, self.rdate,
+                self.mround1, self.mround2, self.mround3)
 
     def __str__(self):
-        return "Round[%d]: course=%d, %s" % \
-               (self.num, self.course_num, self.rdate)
+        return "Round[%d]: course=%d, %s, %d/%d/%d" % \
+               (self.num, self.course_num, self.rdate,
+                self.mround1, self.mround2, self.mround3)
 
 class RoundDetail:
     '''
@@ -77,7 +89,8 @@ class RoundDetail:
     '''
     def __init__(self, rnum, pnum, fscore=None, bscore=None,
                  acnt=0, ecnt=0, aecnt=0,
-                 calc_fscore=None, calc_bscore=None, calc_oscore=None):
+                 calc_fscore=None, calc_bscore=None, calc_oscore=None,
+                 moola_rnd1=None, moola_rnd2=None, moola_rnd3=None):
         self.round_num = int(rnum)
         self.player_num = int(pnum)
         # these are the round score: front and back
@@ -89,9 +102,13 @@ class RoundDetail:
         self.ecnt = ecnt
         self.aecnt = aecnt
         # CALCULATED fractional scores for front, back, and overall
-        self.calc_fscore = MyFraction() if calc_fscore is None else calc_fscore
-        self.calc_bscore = MyFraction() if calc_bscore is None else calc_bscore
-        self.calc_oscore = MyFraction() if calc_oscore is None else calc_oscore
+        self.calc_fscore = MyFraction(0) if calc_fscore is None else calc_fscore
+        self.calc_bscore = MyFraction(0) if calc_bscore is None else calc_bscore
+        self.calc_oscore = MyFraction(0) if calc_oscore is None else calc_oscore
+        # money round: amount of money won
+        self.moola_rnd1 = Money(0) if moola_rnd1 is None else moola_rnd1
+        self.moola_rnd2 = Money(0) if moola_rnd2 is None else moola_rnd2
+        self.moola_rnd3 = Money(0) if moola_rnd3 is None else moola_rnd3
 
     def __cmp__(self, other):
         if self.round_num != other.round_num:
@@ -127,6 +144,19 @@ class RoundDetail:
             if s < o:
                 dprint("compare round detail: %s (s<o) NOT EQUAL" % fname)
                 return -1
+        for fname in ['moola_rnd1', 'moola_rnd2', 'moola_rnd3']:
+            s = getattr(self, fname)
+            o = getattr(other, fname)
+            if s > o:
+                dprint("compare round detail: %s (s>o) NOT EQUAL" % fname)
+                dprint("s:", s)
+                dprint("o:", o)
+                return 1
+            if s < o:
+                dprint("compare round detail: %s (s<o) NOT EQUAL" % fname)
+                dprint("s:", s)
+                dprint("o:", o)
+                return -1
         dprint("compare round detail: *** EQUAL ***")
         return 0
 
@@ -138,6 +168,14 @@ class RoundDetail:
         self.acnt = acnt
         self.ecnt = ecnt
         self.aecnt = aecnt
+
+    def SetMoney(self, mr1, mr2, mr3):
+        self.moola_rnd1 = mr1
+        self.moola_rnd2 = mr2
+        self.moola_rnd3 = mr3
+
+    def GetMoney(self):
+        return self.moola_rnd1 + self.moola_rnd2 + self.moola_rnd3
 
     def Overall(self):
         '''Return overall, assuming round has been scored'''
@@ -173,13 +211,21 @@ class RoundDetail:
         self.calc_oscore = score
         dprint("Set overall score to %s" % score)
 
+    def __repr__(self):
+        return "RoundDetail(%d, %d, %s, %s, %d, %d, %d, %s, %s, %s, %s, %s, %s)" \
+               (self.player_num, self.fscore, self.bscore,
+                self.acnt, self.ecnt, self.aecnt,
+                self.calc_fscore, self.calc_bscore, self.calc_oscore,
+                self.moola_rnd1, self.moola_rnd2, self.moola_rnd3)
+
     def __str__(self):
-        return "RoundDetail[]: round_num=%d, " % self.round_num + \
-               "player_num=%d, fscore=%s, bscore=%s, " % \
+        return "RoundDetail[]: rnd=%d, " % self.round_num + \
+               "pnum=%d, fscore=%s, bscore=%s, " % \
                (self.player_num, self.fscore, self.bscore) + \
-               "a/e/ae=%d/%d/%d => %s|%s|%s" % \
+               "a/e/ae=%d/%d/%d => %s|%s|%s, Money=%s,%s,%s" % \
                (self.acnt, self.ecnt, self.aecnt,
-                self.calc_fscore, self.calc_bscore, self.calc_oscore)
+                self.calc_fscore, self.calc_bscore, self.calc_oscore,
+                self.moola_rnd1, self.moola_rnd2, self.moola_rnd3)
 
 class SearchResult:
     '''
@@ -197,9 +243,12 @@ class SearchResult:
         self.acnt = 0
         self.ecnt = 0
         self.aecnt = 0
-        self.won_9s = 0             # 9 pts for a front or back win
-        self.won_33s = 0           # 33 pts for front, back, and overall
-        self.won_18s = 0                # best overall score but not 33
+        self.won_9s = 0          # best on 9 holes
+        self.won_18s = 0         # best on 18 holes
+        self.won_33s = 0         # best on both 9 and on 18 (33 pts)
+        self.best_fscore = MyFraction(999)  # best score seen on front 9
+        self.best_bscore = MyFraction(999)   # best score seen on back 9
+        self.money_won = Money(0)
 
     def TotalPoints(self):
         return self.front_pts + self.back_pts + self.overall_pts
@@ -227,20 +276,33 @@ class SearchResult:
         if rd.calc_oscore == MyFraction(15):
             dprint("Won an 18!")
             self.won_18s += 1
-        dprint("Scoring results for overall score: %s" % rd.CalcScore())
+        dprint("Scoring results for Overall Points (33 max): %s" % \
+               rd.CalcScore())
         if rd.CalcScore() == MyFraction(33):
             dprint("Won an 33!")
             self.won_33s += 1
-            
+        if rd.fscore < self.best_fscore:
+            self.best_fscore = rd.fscore
+            dprint("Set best front score to:", self.best_fscore)
+        if rd.bscore < self.best_bscore:
+            self.best_bscore = rd.bscore
+            dprint("Set best back score to:", self.best_bscore)
+        self.money_won += rd.GetMoney()
+        dprint("Added $%s, total now $%s" % (rd.GetMoney(), self.money_won))
 
     def PointsPerRound(self):
         return self.TotalPoints() / self.rnd_cnt
 
     def __str__(self):
-        return "SearchResult[pnum=%d]: rnd_cnt=%d, front/rear/overall-pts=%s/%s/%s, a/e/ae=%d/%d/%d" % \
-               (self.pnum, self.rnd_cnt,
-                self.front_pts, self.back_pts, self.overall_pts,
-                self.acnt, self.ecnt, self.aecnt)
+        return "SearchResult[%d]: rnd_cnt=%d, " % (self.pnum, self.rnd_cnt) + \
+               "front/rear/overall-pts=%s/%s/%s, " % \
+               (self.front_pts, self.back_pts, self.overall_pts) + \
+               "a/e/ae=%d/%d/%d, " % \
+               (self.acnt, self.ecnt, self.aecnt) + \
+               "9s/18s/33s=%d/%d/%d, " % \
+               (self.won_9s, self.won_18s, self.won_33s) + \
+               "best f/r=%+d/%+d, " % (self.best_fscore, self.best_bscore) + \
+               "%s" % self.money_won
 
 
 DB_DIR = 'db'
@@ -316,10 +378,13 @@ def init_rounds():
     dprint("Initializing Disc Golf Rounds ...")
     RoundList = {}
     for row in db_cmd_exec('SELECT * FROM rounds'):
-        (round_num, course_num, rdate) = row[0:3]
-        dprint("Adding round[%d]: course_num=%s, rnd_date=%s" % \
-               (round_num, course_num, rdate))
-        RoundList[round_num] = Round(round_num, course_num, rdate)
+        (round_num, course_num, rdate, mround1, mround2, mround3) = row[0:6]
+        dprint("Adding round[%d]: course_num=%s, rnd_date=%s, " % \
+               (round_num, course_num, rdate) + \
+               "mround[]=%d/%d/%d" % (mround1, mround2, mround3))
+        rnd = Round(round_num, course_num, rdate, mround1, mround2, mround3)
+        RoundList[round_num] = rnd
+        dprint("Added:", rnd)
     dprint("Initializing Disc Golf Round Details ...")
     RoundDetailList = []
     for row in db_cmd_exec('SELECT * from round_details'):
@@ -328,20 +393,23 @@ def init_rounds():
          acnt, ecnt, aecnt,
          fscore_num, fscore_den,
          bscore_num, bscore_den,
-         oscore_num, oscore_den) = row[0:13]
+         oscore_num, oscore_den,
+         mrnd1, mrnd2, mrnd3) = row[0:16]
         dprint("Adding round detail: " +
                "rnd_num=%d, p_num=%d, " % (round_num, player_num) +
                "fscore=%d, bscore=%d, " % (fscore, bscore) +
-               "a/e/ae=%d/%d/%d, score=%d/%d|%d/%d|%d/%d" % \
+               "a/e/ae=%d/%d/%d, score=%d/%d|%d/%d|%d/%d, " % \
                (acnt, ecnt, aecnt,
                 fscore_num, fscore_den,
                 bscore_num, bscore_den,
-                oscore_num, oscore_den))
+                oscore_num, oscore_den) + \
+               "Money=%s/%s/%s" % (mrnd1, mrnd2, mrnd3))
         rd = RoundDetail(round_num, player_num, fscore, bscore,
                          acnt, ecnt, aecnt,
                          MyFraction(fscore_num, fscore_den),
                          MyFraction(bscore_num, bscore_den),
-                         MyFraction(oscore_num, oscore_den))
+                         MyFraction(oscore_num, oscore_den),
+                         Money(0, mrnd1), Money(0, mrnd2), Money(0, mrnd3))
         RoundDetailList.append(rd)
         dprint("Added:", rd)
 
@@ -377,9 +445,12 @@ def add_round(rnd, rd_list):
     dprint("Adding to DB:", rnd)
     for rd in rd_list:
         dprint(rd)
-    db_cmd_exec('''INSERT INTO rounds(course_num, rdate)
-                   VALUES(%d,"%s")''' % \
-                (rnd.course_num, rnd.rdate.strftime("%m/%d/%Y")))
+    db_cmd_exec('''INSERT INTO rounds(course_num,rdate,mround1,mround2,mround3)
+                   VALUES(%d,"%s",%d,%d,%d)''' % \
+                (rnd.course_num, rnd.rdate.strftime("%m/%d/%Y"),
+                 rnd.mround1.AsCents(),
+                 rnd.mround2.AsCents(),
+                 rnd.mround3.AsCents()))
     for rd in rd_list:
         db_cmd_exec('''INSERT INTO round_details(round_num, player_num,
                                                  fscore, bscore,
@@ -389,21 +460,34 @@ def add_round(rnd, rd_list):
                                                  calc_bscore_numerator,
                                                  calc_bscore_denominator,
                                                  calc_oscore_numerator,
-                                                 calc_oscore_denominator)
-                       VALUES(%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)''' % \
+                                                 calc_oscore_denominator,
+                                                 money_rnd1_winnings,
+                                                 money_rnd2_winnings,
+                                                 money_rnd3_winnings)
+               VALUES(%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)''' % \
                     (rd.round_num, rd.player_num,
                      rd.fscore, rd.bscore,
-                     rd.acnt, rd.ecnt, rd.eacnt,
+                     rd.acnt, rd.ecnt, rd.aecnt,
                      rd.calc_fscore.numerator, rd.calc_fscore.denominator,
                      rd.calc_bscore.numerator, rd.calc_bscore.denominator,
-                     rd.calc_oscore.numerator, rd.calc_oscore.denominator))
+                     rd.calc_oscore.numerator, rd.calc_oscore.denominator,
+                     rd.moola_rnd1.AsCents(),
+                     rd.moola_rnd2.AsCents(),
+                     rd.moola_rnd3.AsCents()))
 
 
 def modify_round(rnd, rd_list):
-    '''Modify the specified round and list of round details in the DB'''
-    dprint("Modifying in DB:", rnd)
+    '''
+    Modify the specified round and list of round details in the DB
+    '''
+    dprint("Modifying DB:", rnd)
     for rd in rd_list:
         dprint(rd)
+    dprint("Tryig to udate DB for:", rnd)
+    db_cmd_exec('''UPDATE rounds
+                   SET mround1=%d,mround2=%d,mround3=%d
+                   WHERE num=%d''' % \
+                (rnd.mround1, rnd.mround2, rnd.mround3, rnd.num))
     for rd in rd_list:
         dprint("Trying to update DB for:", rd)
         db_cmd_exec('''UPDATE round_details
@@ -414,13 +498,19 @@ def modify_round(rnd, rd_list):
                            calc_bscore_numerator=%d,
                            calc_bscore_denominator=%d,
                            calc_oscore_numerator=%d,
-                           calc_oscore_denominator=%d
+                           calc_oscore_denominator=%d,
+                           money_rnd1_winnings=%d,
+                           money_rnd2_winnings=%d,
+                           money_rnd3_winnings=%d
                        WHERE round_num=%d AND player_num=%d''' % \
                     (rd.fscore, rd.bscore,
                      rd.acnt, rd.ecnt, rd.aecnt,
                      rd.calc_fscore.numerator, rd.calc_fscore.denominator,
                      rd.calc_bscore.numerator, rd.calc_bscore.denominator,
                      rd.calc_oscore.numerator, rd.calc_oscore.denominator,
+                     rd.moola_rnd1.AsCents(),
+                     rd.moola_rnd2.AsCents(),
+                     rd.moola_rnd3.AsCents(),
                      rd.round_num, rd.player_num))
 
 def round_details_equal(rd_list1, rd_list2):
@@ -440,6 +530,8 @@ def round_details_equal(rd_list1, rd_list2):
         rd2 = rd_list2[idx]
         dprint("Comparing:", rd1)
         dprint("With:     ", rd2)
+        r = (rd1 != rd2)
+        dprint("Comparison result:", r)
         if rd1 != rd2:
             dprint("Item lists unequal", rd1, ", ", rd2)
             return False

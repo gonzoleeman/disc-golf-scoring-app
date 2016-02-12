@@ -6,6 +6,7 @@ List Control Customizations
 
 from utils import dprint
 from opts import opts
+from money import Money, money_from_string
 
 import wx
 import wx.lib.mixins.listctrl as wxlc
@@ -43,14 +44,19 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
                              style=wx.LC_REPORT|wx.LC_SINGLE_SEL,
                              size=wx.Size(10, 10))
         wxlc.ListCtrlAutoWidthMixin.__init__(self)
-        self.num_re = re.compile('[+-]?[0-9]+$')
+        self.num_re = re.compile('[+-]?\d+$')
+        self.money_re = re.compile('[$]?((\d*\.\d\d)|(\d+(\.(\d\d)?)?))$')
         self.Bind(wx.EVT_LIST_BEGIN_LABEL_EDIT, self.CheckEditBegin)
         self.Bind(wx.EVT_LIST_END_LABEL_EDIT, self.CheckEditEnd)
         self.num_columns = 0
         self.itemColumnFmt = []
+        self.itemColumnEditOkList =[]
 
     def GetListCtrl(self):
         return self
+
+    def SetEditColumnOk(self, col_num_list):
+        self.itemColumnEditOkList = col_num_list
 
     def SetupListHdr(self, itemHdr, itemFmt, itemColumnFmt):
         self.num_columns = len(itemHdr)
@@ -87,7 +93,7 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
     def CheckEditBegin(self, evt):
         dprint("*** Checking edit (begin):", evt)
         dprint("*** Should we edit col=%d, text=%s?" % (evt.m_col, evt.Text))
-        if evt.m_col in [1, 2, 4, 5, 6]:
+        if evt.m_col in self.itemColumnEditOkList:
             dprint("ALLOWing edit of column %d" % evt.m_col)
             evt.Allow()
             self.before_edit = evt.Text
@@ -116,12 +122,30 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
         * Number uses up the whole string
         '''
         field_str = self.GetItem(row, col).GetText()
-        #dprint("Found item[row=%d, col=%d] = '%s'" % (row, col, field_str))
+        #dprint("Found numeric item[row=%d, col=%d] = '%s'" % \
+        # (row, col, field_str))
         if not self.num_re.match(field_str):
             raise ArithmeticError(field_str, col)
-
         val = int(field_str)
         #dprint("Found a number: '%s' -> %d" % (field_str, val))
+        return val
+
+    def GetFieldMonetaryValue(self, row, col):
+        '''
+        Ensure the string is a valid money amount:
+        * Starts with an optional dollar sign
+        * zero or more digits
+        * a decimal point
+        * two more digits
+        '''
+        field_str = self.GetItem(row, col).GetText()
+        dprint("Found money item[row=%d, col=%d] = '%s'" % \
+               (row, col, field_str))
+        if not self.money_re.match(field_str):
+            raise ArithmeticError(field_str, col)
+        # convert to dollars and cents
+        val = money_from_string(field_str)
+        dprint("Found money: $%s" % val)
         return val
 
 

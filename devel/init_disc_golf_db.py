@@ -71,7 +71,7 @@ rounds_preload_list = [
     # 5.     mround2				- $ round 2 won on which pass?
     # 6.      mround3				- $ round 3 won on which pass?
     (1, "1/10/2016", 1, 3, 0),          # Dick's
-    (5, "1/24/2016", 6, 4, 0),          # Pat's
+    (5, "1/24/2016", 6, 7, 0),          # Pat's
     ]
 
 round_details_preload_list = [

@@ -6,37 +6,47 @@ us to keep track of courses and holes on that course
 TO DO:
     - Update score results frame if a new "score" is done
 
+    - Always show "Mz Kitty" on results, in case she won money?
+      (or only if she won money?)
+
+    - For counting 9-s, 18-s, and 33-s, what if, for example,
+      somebody ties on the front 9. Do both folks get 9-s?
+
+    - update "Overall" when "Front 9" or "Back 9" updated for
+      "Round Scoring" frame, in real time
+
+    - Add date range to score results display window, as well
+      as number of rounds found for that range, as well as number of
+      round in this report (not just for each player)
+
+    - Add "number of records matched" to ScoreResults Frame, possibly
+      in a (new) status window?
+
+    - Add "Notes" to round detail entry? (for stuff DB doesn not cover?)
+
     - Keep track of Aces, Eagles, and Ace-Eagles on a per-hole basis,
       e.g. have a drop-down radio-button list in the menu for each
       of the 18 hole
 
-    - Add in tracking of 2 (or 3) money rounds: who won, on which of 6
-      max rounds, including Miss Kitty if no human won after 6 rounds
-
     - Add option to backup the DB. (Periodically, or on demand?)
-
-    - figure out true meaning of 9-s, 18-s, and 33-s
 
     - Allow update of DB any time, but warn user that "calc is needed"
       if they have updated a front or back 9 score
 
-    - Break status window into 2 parts: the first is the file
+    - Break main status window into 2 parts: the first is the file
       name of the database, and the 2nd is for error messages
       (for which frame(s)?)
 
     - Update status with number of matching round in the report window,
-      when setting a date range
+      when setting a date range ???
 
     - As soon as any field changed in the Scoring GUI, update
       the status window to say "Edited"
 
-    - report on best front and back rounds
-
     - handle "E" as the number "0" (i.e. "even") for score fields,
       and display "E" instead of "+0" (enhancement)
 
-    - Add an "All time" date range for the report screen
-    - display results as a graph?
+    - display results graphically?
     
     - quit guessing what new round number will be, and actually let
       the database decide
@@ -57,10 +67,12 @@ TO DO:
 
     - Support alternate/new Database files (why?)
 
-    - support DB modification for Courses and Players (some day)
+    - support DB modification for Courses and Players (some day),
+      so I do not have to use sqlite3 directly, or write a program, to
+      do this
 
     - support modifying a round to add or remove a player,
-      or even to remove a round? (not needed?)
+      or even to remove a round? (not needed, and possibly evil)
 
     - Properly package for distribution (for who?)
 
@@ -90,6 +102,9 @@ History:
         as "+N", or "-N". Also, now displaying "overall" score
     version 1.12: Now tracking front/rear/overall score separately, per
         round played, for easier tracking of 9-s, 18-s, etc.
+    version 1.13: Many changes, including handling money rounds, and
+        displaying money won and best front and rear rounds. Also added
+        new date ranges for reports
 '''
 
 
@@ -98,6 +113,7 @@ from optparse import OptionParser
 import wx
 import re
 import datetime as dt
+from wx import DateTime as wxdt
 from wx.lib.pubsub import Publisher as pub
 import copy
 
@@ -107,11 +123,12 @@ from opts import opts
 import score
 import listctrl as lc
 import money
+import wxdate
 
 
 
 __author__ = "Lee Duncan"
-__version__ = "1.12"
+__version__ = "1.13"
 
 
 class SetupRoundFrame(wx.Frame):
@@ -195,10 +212,17 @@ class SetupRoundFrame(wx.Frame):
         ################################################################
         panel.SetSizer(vbox)
 
-    def DateChanged(self, e):
-        dprint("Date Changed!:", e)
+    def SetErrorStatus(self, msg):
+        self.status_bar.SetStatusText(msg)
+        self.status_bar.SetBackgroundColour(wx.RED)
+
+    def ClearErrorStatus(self):
         self.status_bar.SetStatusText("")
         self.status_bar.SetBackgroundColour(wx.NullColour)
+
+    def DateChanged(self, e):
+        dprint("Date Changed!:", e)
+        self.ClearErrorStatus()
 
     def SetScoreButtonState(self):
         '''Set appropriate state for the "Score" Button'''
@@ -244,8 +268,7 @@ class SetupRoundFrame(wx.Frame):
             dprint("Looking at:", rnd)
             if rnd.rdate == rdate:
                 dprint("Duplicate!?")
-                self.status_bar.SetStatusText("Duplicate Round Date!")
-                self.status_bar.SetBackgroundColour(wx.RED)
+                self.SetErrorStatus("Duplicate Round Date!")
                 return
         ################################################################
         this_round = rdb.Round(rdb.next_round_num(), cnum, rdate_str)
@@ -287,7 +310,7 @@ class RoundScoringFrame(wx.Frame):
     '''
     def __init__(self, *args, **kwargs):
         super(RoundScoringFrame, self).__init__(*args, **kwargs)
-        self.SetSize(wx.Size(700, 300))
+        self.SetSize(wx.Size(900, 300))
         self.is_edited = False
         self.cnum = None
         self.rdate = None
@@ -297,6 +320,7 @@ class RoundScoringFrame(wx.Frame):
         self.round_details = None
         self.calc_done = False
         self.Bind(wx.EVT_CLOSE, self.OnCancel)
+        self.data_from_form_up_to_date = False
 
     def MyCreate(self, this_round, round_details, for_update=False):
         self.cnum = this_round.course_num
@@ -350,48 +374,59 @@ class RoundScoringFrame(wx.Frame):
         ################################################################
         vbox.AddSpacer(15)
         hbox2_5 = wx.BoxSizer(wx.HORIZONTAL)
-        st6 = wx.StaticText(panel, label='Money Rounds Results:')
+        st6 = wx.StaticText(panel, label='Money Round Results:')
         st6.SetFont(bold_font)
-        choices = ['<None>'] + \
-                  [str(i) for i in range(18)] + \
+        choices = ['<NotPlayed>'] + \
+                  [str(i) for i in range(1,7)] + \
                   ['<MzKitty>']
+        dprint("==> Setting up round choices, this_round:", self.this_round)
+        dprint("    to: 1st=%d, 2nd=%d, 3rd=%d" % \
+               (self.this_round.mround1,
+                self.this_round.mround2,
+                self.this_round.mround3))
         st7 = wx.StaticText(panel, label='First:')
-        self.money_finish = []
-        self.money_finish.append(wx.Choice(panel, choices=choices))
+        self.mf1 = wx.Choice(panel, choices=choices, id=1)
+        self.mf1.Select(self.this_round.mround1)
+        self.mf1.Enable(self.this_round.mround1 > 0)
         st8 = wx.StaticText(panel, label='Second:')
-        self.money_finish.append(wx.Choice(panel, choices=choices))
+        self.mf2 = wx.Choice(panel, choices=choices, id=2)
+        self.mf2.Select(self.this_round.mround2)
+        self.mf2.Enable(self.this_round.mround2 > 0)
         st9 = wx.StaticText(panel, label='Third:')
-        self.money_finish.append(wx.Choice(panel, choices=choices))
+        self.mf3 = wx.Choice(panel, choices=choices, id=3)
+        self.mf3.Select(self.this_round.mround3)
+        self.mf3.Enable(self.this_round.mround3 > 0)
+        self.Bind(wx.EVT_CHOICE, self.OnMoneyRound, source=self.mf1)
+        self.Bind(wx.EVT_CHOICE, self.OnMoneyRound, source=self.mf2)
+        self.Bind(wx.EVT_CHOICE, self.OnMoneyRound, source=self.mf3)
         hbox2_5.AddSpacer(20)
         hbox2_5.Add(st6)
         hbox2_5.AddSpacer(15)
         hbox2_5.Add(st7)
-        hbox2_5.Add(self.money_finish[0])
+        hbox2_5.Add(self.mf1)
         hbox2_5.AddSpacer(15)
         hbox2_5.Add(st8)
-        hbox2_5.Add(self.money_finish[1])
+        hbox2_5.Add(self.mf2)
         hbox2_5.AddSpacer(15)
         hbox2_5.Add(st9)
-        hbox2_5.Add(self.money_finish[2])
+        hbox2_5.Add(self.mf3)
         vbox.Add(hbox2_5, flag=wx.LEFT|wx.RIGHT|wx.EXPAND, border=10)
         vbox.AddSpacer(15)
         ################################################################
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
         self.score_list = lc.AutoWidthListEditCtrl(panel)
-        self.score_list.SetupListHdr(['Name', 'Front 9', 'Back 9', 'Overall',
-                                      'Aces', 'Eagles', 'Ace-Eagles', 'Score'],
-                                     [wx.LIST_FORMAT_LEFT,
-                                      wx.LIST_FORMAT_CENTER,
-                                      wx.LIST_FORMAT_CENTER,
-                                      wx.LIST_FORMAT_CENTER,
-                                      wx.LIST_FORMAT_CENTER,
-                                      wx.LIST_FORMAT_CENTER,
-                                      wx.LIST_FORMAT_CENTER,
-                                      wx.LIST_FORMAT_CENTER],
+        self.hdg_items = ['Name', 'Front 9', 'Back 9', 'Overall',
+                          'Aces', 'Eagles', 'Ace-Eagles', 'Score',
+                          '$ Rnd 1', '$ Rnd 2', '$ Rnd 3']
+        self.score_list.SetupListHdr(self.hdg_items,
+                                     [wx.LIST_FORMAT_LEFT] + \
+                                     [wx.LIST_FORMAT_CENTER] * 10,
                                      ['%s', '%+d', '%+d', '%+d',
-                                      '%d', '%d', '%d', '%s'])
+                                      '%d', '%d', '%d', '%s',
+                                      '%s', '%s', '%s' ])
         item_data = self.RoundDetailsAsDict()
         self.score_list.SetupListItems(item_data)
+        self.score_list.SetEditColumnOk([1, 2, 4, 5, 6, 8, 9, 10])
         hbox3.Add(self.score_list, 1, wx.EXPAND|wx.ALL, border=10)
         vbox.Add(hbox3, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
         ################################################################
@@ -425,15 +460,15 @@ class RoundScoringFrame(wx.Frame):
         self.status_bar.SetBackgroundColour(wx.NullColour)
 
     def OnCommit(self, e):
-        dprint("OnCommit: string=%s" % e.GetString())
-        dprint("%s DB requested -- hope you're sure" % e.GetString())
-        dprint("State: edited=%s, calc_done=%s" % \
-               (self.is_edited, self.calc_done))
-        if self.is_edited and not self.calc_done:
-            self.GetDataFromForm()
-        if not self.is_edited:
-            dprint("Huh????")
+        dprint("OnCommit: %s DB requested" % \
+               ('Update' if self.for_update else 'Commit'))
+        dprint("DB State: edited=%s, calc_done=%s form_up_to_date=%s, " % \
+               (self.is_edited, self.calc_done, self.data_from_form_up_to_date))
+        if not self.GetDataFromFrameIfNeeded():
+            dprint("XXX need to diplay error status here: data invalid!")
             return
+        if not self.is_edited:
+            raise Exception("Internal Error: Committing non-edited list?")
         if self.for_update:
             rdb.modify_round(self.this_round, self.round_details)
         else:
@@ -444,6 +479,43 @@ class RoundScoringFrame(wx.Frame):
         self.is_edited = False
         self.Close()
 
+    def OnMoneyRound(self, e):
+        choice_idx = e.GetInt()         # 0-7
+        choice_id = e.GetId()           # 1, 2, or 3
+        dprint("*** OnMoneyRound: round %d choosen: %s" % \
+               (choice_id, choice_idx))
+        if choice_id == 1:
+            dprint("Update Money Round 1 to value %d" % choice_idx)
+            cur_val = self.this_round.mround1
+            if choice_idx > 0:
+                # make sure round2 option is available and configured
+                self.mf2.Enable()
+                self.mf2.Select(self.this_round.mround2)
+            elif choice_idx == 0:
+                # no round2 if round1 was not played
+                self.mf2.Select(0)
+                self.mf2.Disable()
+        elif choice_id == 2:
+            dprint("Update Money Round 2 to value %d" % choice_idx)
+            cur_val = self.this_round.mround2
+            if choice_idx > 0:
+                # make sure round3 option is available and configured
+                self.mf3.Enable()
+                self.mf3.Select(self.this_round.mround3)
+            elif choice_idx == 0:
+                # no round3 if round2 was not played
+                self.mf3.Select(0)
+                self.mf3.Disable()
+        elif choice_id == 3:
+            dprint("Update Money Round 3 to value %d" % choice_idx)
+            cur_val = self.this_round.mround3
+        new_val = choice_idx
+        if cur_val != new_val:
+            dprint("Choice was changed from %d to %d" % (cur_val, new_val))
+            self.is_edited = True
+            self.data_from_form_up_to_date = False
+            self.commit_button.Enable()
+
     def RoundDetailsAsDict(self):
         dprint("Making Round Details into dictionary ...")
         item_data = {}
@@ -453,14 +525,56 @@ class RoundScoringFrame(wx.Frame):
             item_data[rd.player_num] = (player.name,
                                         rd.fscore, rd.bscore, rd.Overall(),
                                         rd.acnt, rd.ecnt, rd.aecnt,
-                                        rd.CalcScore())
+                                        rd.CalcScore(),
+                                        rd.moola_rnd1,
+                                        rd.moola_rnd2,
+                                        rd.moola_rnd3)
+            dprint("Set item_data[%d] to" % rd.player_num,
+                   item_data[rd.player_num])
         return item_data
 
-    def GetDataFromForm(self):
-        '''Get data from our list into our self.round_details'''
+    def SetErrorStatus(self, msg):
+        self.status_bar.SetStatusText(msg)
+        self.status_bar.SetBackgroundColour(wx.RED)
+
+    def ClearErrorStatus(self):
+        self.status_bar.SetStatusText("")
+        self.status_bar.SetBackgroundColour(wx.NullColour)
+
+    def GetDataFromFrameIfNeeded(self):
+        '''
+        Get data from our score list into our self.round_details
+
+        Return True if data was legal,
+        Else return False and leave data partially updated
+        '''
+        dprint("*** GetDataFromFrameIfNeeded: form_up_to_date=%s" % \
+               self.data_from_form_up_to_date )
+        if self.data_from_form_up_to_date:
+            return True
         # get data from list into
+        ####
+        dprint(self.this_round)
+        mr1 = self.mf1.GetSelection()
+        mr2 = self.mf2.GetSelection()
+        mr3 = self.mf3.GetSelection()
+        if mr1 == 0 and mr2 > 0:
+            self.SetErrorStatus("Money Round 2 without Round 1?")
+            return
+        if mr2 == 0 and mr3 > 0:
+            self.SetErrorStatus("Money Round 3 without Round 2?")
+            return
+        self.this_round.mround1 = mr1
+        self.this_round.mround2 = mr2
+        self.this_round.mround3 = mr3
+        ####
         cnt = self.score_list.GetItemCount()
-        dprint("Our round detail list has %d items" % cnt)
+        dprint("Round detail list has %d items for round %d:" % \
+               (cnt, self.this_round.num))
+        dprint("Updating round details: money round tries: %d, %d, %d" % \
+               (self.this_round.mround1,
+                self.this_round.mround2,
+                self.this_round.mround3))
         for c in range(cnt):
             dprint("Looking for round_detail index %d" % c)
             round_detail = self.round_details[c]
@@ -470,26 +584,54 @@ class RoundScoringFrame(wx.Frame):
             try:
                 f9 = self.score_list.GetFieldNumericValue(c, 1)
                 b9 = self.score_list.GetFieldNumericValue(c, 2)
+                acnt = self.score_list.GetFieldNumericValue(c, 4)
+                ecnt = self.score_list.GetFieldNumericValue(c, 5)
+                aecnt = self.score_list.GetFieldNumericValue(c, 6)
+                mr1_cents = self.score_list.GetFieldMonetaryValue(c, 8)
+                
+                mr2_cents = self.score_list.GetFieldMonetaryValue(c, 9)
+                mr3_cents = self.score_list.GetFieldMonetaryValue(c, 10)
             except ArithmeticError, e:
                 col_no = e.args[1]
-                if col_no == 1:
-                    loc = 'Front 9'
-                else:
-                    loc = 'Back 9'
-                self.status_bar.SetStatusText("%s's %s invalid" % (pname, loc))
-                self.status_bar.SetBackgroundColour(wx.RED)
+                hdg = self.hdg_items[col_no]
+                self.SetErrorStatus("%s's %s invalid" % (pname, hdg))
+                return False
+            if not mr1 and mr1_cents.AsCents():
+                self.SetErrorStatus(\
+                    "%s's can't have Round 1 money: Round Not Played" % \
+                    pname)
+                return
+            if not mr2 and mr2_cents.AsCents():
+                self.SetErrorStatus(\
+                    "%s's can't have Round 2 money: Round Not Played" % \
+                    pname)
+                return
+            if not mr3 and mr3_cents.AsCents():
+                self.SetErrorStatus(\
+                    "%s's can't have Bonus Round money: Round Not Played" % \
+                    pname)
                 return
             self.round_details[c].SetScore(f9, b9)
-            dprint("Front/Back Nine for player %s: %d/%d" % (pname, f9, b9))
-            acnt = self.score_list.GetFieldNumericValue(c, 4)
-            ecnt = self.score_list.GetFieldNumericValue(c, 5)
-            aecnt = self.score_list.GetFieldNumericValue(c, 6)
             self.round_details[c].SetCounts(acnt, ecnt, aecnt)
-            self.status_bar.SetStatusText("")
-            self.status_bar.SetBackgroundColour(wx.NullColour)
+            self.round_details[c].SetMoney(mr1_cents, mr2_cents, mr3_cents)
+            self.ClearErrorStatus()
+        ####
+        self.data_from_form_up_to_date = True
+        return True
+
+    def SetErrorStatus(self, msg):
+        self.status_bar.SetStatusText(msg)
+        self.status_bar.SetBackgroundColour(wx.RED)
+
+    def ClearErrorStatus(self):
+        self.status_bar.SetStatusText("")
+        self.status_bar.SetBackgroundColour(wx.NullColour)
 
     def OnCalculate(self, e):
-        self.GetDataFromForm()
+        dprint("*** OnCalculate ...")
+        if not self.GetDataFromFrameIfNeeded():
+            dprint("Round data AFU!")
+            return
         dprint("All fields OK! scoring ...")
         pre_scored_details = copy.deepcopy(self.round_details)
         scored_details = score.score_round(self.round_details)
@@ -505,6 +647,8 @@ class RoundScoringFrame(wx.Frame):
         if was_changed:
             # set 'edited' in case it was not set before
             self.is_edited = True
+            # flag that we need to update data from our form
+            self.data_from_form_up_to_date = False
             dprint("List *WAS* edited: updating")
             self.round_details = scored_details
             item_data = self.RoundDetailsAsDict()
@@ -530,7 +674,7 @@ class RoundScoringFrame(wx.Frame):
         self.Destroy()
 
     def OnListEdited(self, evt):
-        dprint("OnListEdited: Col=%d: %s", (evt.col, evt.message))
+        dprint("OnListEdited: Col=%d: %s" % (evt.col, evt.message))
         # was editing in the front9/back9 columns?
         if evt.col in [1, 2]:
             self.calc_button.Enable()
@@ -538,16 +682,18 @@ class RoundScoringFrame(wx.Frame):
         # but any change means we need to save the changes
         self.commit_button.Enable()
         self.is_edited = True
+        # flag that we need to update data from our form
+        self.data_from_form_up_to_date = False
 
     def InitUI(self):
         self.SetUpPanel()
         self.Show(True)
 
 
-class DisplayReportFrame(wx.Frame):
+class ScoreResultsFrame(wx.Frame):
     def __init__(self, *args, **kwargs):
-        super(DisplayReportFrame, self).__init__(*args, **kwargs)
-        self.SetSize((825, 250))
+        super(ScoreResultsFrame, self).__init__(*args, **kwargs)
+        self.SetSize((1100, 250))
 
     def MyStart(self, start_rdate, stop_rdate):
         dprint("Report on reults from", start_rdate, "to", stop_rdate)
@@ -570,11 +716,10 @@ class DisplayReportFrame(wx.Frame):
                 continue
             dprint("Found a match!")
             matches_found[rd.player_num].AddResults(rd)
-        for pnum,sr in matches_found.iteritems():
-            dprint("Found match[%d]:" % pnum, sr)
         # fill in data for our GUI list
         self.item_data = {}
         for pnum,sr in matches_found.iteritems():
+            dprint("Found match[%d]:" % pnum, sr)
             if sr.rnd_cnt > 0:
                 pname = rdb.PlayerList[sr.pnum].name
                 self.item_data[pnum] = (pname, sr.rnd_cnt, sr.TotalPoints(),
@@ -582,7 +727,8 @@ class DisplayReportFrame(wx.Frame):
                                         sr.acnt, sr.ecnt, sr.aecnt,
                                         sr.won_9s, sr.won_18s,
                                         sr.won_33s,
-                                        0, 0, 0)
+                                        sr.best_fscore, sr.best_bscore,
+                                        sr.money_won)
                 dprint("Created data item:", self.item_data[pnum])
         self.InitUI()
 
@@ -610,10 +756,11 @@ class DisplayReportFrame(wx.Frame):
         self.results_list.SetupListHdr(\
             ['Name', 'Rounds', 'TtlPts', 'PPR',
              'Aces', 'Eagles', 'Ace-Eagles',
-             '9-s', '18-s', '33-s', '$ Won', 'Best F9', 'Best B9'],
+             '9-s', '18-s', '33-s', 'Best F9', 'Best B9', '$ Won'],
             [wx.LIST_FORMAT_LEFT, wx.LIST_FORMAT_CENTER] + \
-            [wx.LIST_FORMAT_RIGHT] * 11,
-            ['%s', '%d', '%5.2f', '%5.2f'] + ['%d'] * 9)
+            [wx.LIST_FORMAT_RIGHT] * 10 + [wx.LIST_FORMAT_CENTER],
+            ['%s', '%d', '%5.2f', '%5.2f'] + \
+            ['%d'] * 6 + ['%+d'] * 2 + ['$%s'])
         self.results_list.SetupListItems(self.item_data)
         hbox2.Add(self.results_list, 1, wx.EXPAND|wx.ALL, border=10)
         vbox.Add(hbox2, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
@@ -680,10 +827,10 @@ class ChooseReportRangeFrame(wx.Frame):
         ################################################################
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
         st = wx.StaticText(panel, label='Precanned Ranges:')
-        date_range_choices = ['<Choose a Range>', 'YTD', 'Last Year']
+        self.date_range_choices = wxdate.DATE_RANGES
         self.cbox = wx.ComboBox(panel, id=wx.ID_ANY,
-                                value=date_range_choices[0],
-                                choices=date_range_choices,
+                                value=self.date_range_choices[0],
+                                choices=self.date_range_choices,
                                 style=wx.CB_READONLY)
         self.Bind(wx.EVT_COMBOBOX, self.DateRangeChoosen, source=self.cbox)
         hbox3.Add(st)
@@ -705,12 +852,19 @@ class ChooseReportRangeFrame(wx.Frame):
         ################################################################
         panel.SetSizer(vbox)
 
+    def SetErrorStatus(self, msg):
+        self.status_bar.SetStatusText(msg)
+        self.status_bar.SetBackgroundColour(wx.RED)
+
+    def ClearErrorStatus(self):
+        self.status_bar.SetStatusText("")
+        self.status_bar.SetBackgroundColour(wx.NullColour)
+
     def DateChanged(self, e):
         dprint("One of our dates has changed!", e)
         if self.DateRangeValid():
             self.results_button.Enable()
-            self.status_bar.SetStatusText("")
-            self.status_bar.SetBackgroundColour(wx.NullColour)
+            self.ClearErrorStatus()
         else:
             self.results_button.Disable()
 
@@ -718,25 +872,12 @@ class ChooseReportRangeFrame(wx.Frame):
         dprint("A pre-canned Date range has been choosen", e)
         dprint("Choice String: %s" % e.GetString())
         canned_choice = e.GetString()
-        if canned_choice == 'YTD':
-            dprint("Using 1/1/THISYEAR to NOW")
-            dt_end = wx.DateTime.Today()
-            dprint("Found end date (today) of:", dt_end)
-            dt_start = wx.DateTime()
-            dt_start.Set(1, 0, dt_end.GetYear())
-            dprint("Found end date (today) of:", dt_end)
-        elif canned_choice == 'Last Year':
-            dprint("Using 1/1/LASTYEAR to 12/31/LASTYEAR")
-            last_yr = wx.DateTime.Today().GetYear() - 1
-            dt_start = wx.DateTime()
-            dt_start.Set(1, 0, last_yr)
-            dt_end = wx.DateTime()
-            dt_end.Set(31, 11, last_yr)
-        else:
-            dprint("No valid choice")
+        if canned_choice == self.date_range_choices[0]:
+            dprint("No choice made! Bailing")
             return
-        dprint("Starting Date Range:", dt_start)
-        dprint("Stopping Date Range:", dt_end)
+        (dt_start, dt_end) = wxdate.range_from_key(canned_choice)
+        dprint("Frame: Starting Date Range:", dt_start)
+        dprint("Frame: Stopping Date Range:", dt_end)
         self.start_rdate.SetValue(dt_start)
         self.stop_rdate.SetValue(dt_end)
         self.DateChanged(e)
@@ -751,7 +892,7 @@ class ChooseReportRangeFrame(wx.Frame):
 
     def ShowResults(self, e):
         dprint("Show Results, Damnit!", e)
-        df = DisplayReportFrame(self.GetParent(), title="Where's The Beef?")
+        df = ScoreResultsFrame(self.GetParent(), title="Where's The Beef?")
         df.MyStart(self.start_rdate.GetValue(),
                    self.stop_rdate.GetValue())
         self.Close()
@@ -805,7 +946,8 @@ class RoundsFrame(wx.Frame):
                   source=self.round_list, id=wx.ID_ANY)
         self.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.OnListDeselected,
                   source=self.round_list, id=wx.ID_ANY)
-        self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.OnShow)
+        self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.OnShow,
+                  source=self.round_list)
         ################################################################
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
         #self.quit_button = wx.Button(panel, id=wx.ID_EXIT, label='Quit')

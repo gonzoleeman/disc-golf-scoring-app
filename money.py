@@ -3,6 +3,10 @@
 My own money class :(
 """
 
+from opts import opts
+from utils import dprint
+
+
 __author__ = 'Lee Duncan'
 __version__ = '1.0'
 
@@ -12,15 +16,15 @@ class Money:
         d = int(dollars)
         c = int(cents)
         if (d < 0 and c > 0) or (d > 0 and c < 0):
-            print "DEBUG: c:", c
-            print "DEBUG: d:", d
+            #dprint("c:", c)
+            #dprint("d:", d)
             raise Exception("Signs of Dollars and Cents must match")
         while c >= 100:
-            print "moving plus cents to plus dollars"
+            #dprint("moving plus cents to plus dollars")
             d += 1
             c -= 100
         while c <= -100:
-            print "moving minus cents to plus dollars"
+            #dprint("moving minus cents to plus dollars")
             d -= 1
             c += 100
         self.dollars = d
@@ -55,13 +59,28 @@ class Money:
         return "Money(%d,%d)" % (self.dollars, self.cents)
 
     def __str__(self):
-        return "$%d.%02d" % (self.dollars, self.cents)
+        return "%d.%02d" % (self.dollars, self.cents)
+
+    def __cmp__(self, other):
+        return self.AsCents() - other.AsCents()
 
     def AsCents(self):
         return (100 * self.dollars) + self.cents
 
 
 
-if __name__ == '__main__':
-    m = Money(3,45)
-    x = m * 3
+def money_from_string(money_str):
+    if money_str[0] == '$':
+        money_str = money_str[1:]
+        #dprint("Stripped dollar sign from front of amount:", money_str)
+    if '.' in money_str:
+        (d_str, c_str) = money_str.split('.')
+    else:
+        # assume we have only dollars
+        d_str = money_str
+        c_str = '0'
+    d = int(d_str) if len(d_str) else 0
+    c = int(c_str) if len(c_str) else 0
+    dprint("Money: Split fields: '%s'.'%s'" % (d_str, c_str))
+    dprint("       Into:         '%d'.'%d'" % (d, c))
+    return Money(d, c)

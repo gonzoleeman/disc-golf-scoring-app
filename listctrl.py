@@ -184,7 +184,7 @@ class AutoWidthListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
         data_idx = 0
         for key, data in self.itemDataMap.items():
             cfmt = self.itemColumnFmt[0]
-            dprint("Width List: Filling in col=0 row=%d, key=%d, fmt=%s:" % \
+            dprint("With List: Filling in col=0 row=%d, key=%d, fmt=%s:" % \
                    (data_idx, key, cfmt), data)
             self.InsertStringItem(data_idx, d2s(cfmt, data[0]))
             for col_idx in range(1, self.num_columns):

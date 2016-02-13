@@ -24,9 +24,7 @@ __author__ = "Lee Duncan"
 
 
 import sqlite3
-from dateutil.parser import parse as parse_date
-import datetime as dt
-import itertools as it
+from dateutil.parser import parse as parse_date_str
 from myfraction import MyFraction
 from money import Money
 
@@ -63,23 +61,28 @@ class Round:
     '''
     One round, not counting the individual scores
     '''
-    def __init__(self, rnum, cnum, rdate,
+    def __init__(self, rnum, cnum=None, rdate_str=None,
                  mround1=0, mround2=0, mround3=0):
         self.num = int(rnum)
-        self.course_num = int(cnum)
-        self.rdate = parse_date(rdate)
+        self.course_num = None if cnum is None else int(cnum)
+        # rdate is type: datetime.datetime()
+        dprint("Setting rdate from:", rdate_str)
+        self.rdate = None if rdate_str is None else parse_date_str(rdate_str)
         # what try it took for an ace (0 -> none, 7 -> mzKitty)
         self.mround1 = mround1
         self.mround2 = mround2
         self.mround3 = mround3
 
+    def SetDate(self, rdate_str):
+        self.rdate = parse_date_str(rdate_str)
+
     def __repr__(self):
-        return "Round(%d, %d, %s, %d, %d, %d)" % \
+        return "Round(%d, %s, %s, %d, %d, %d)" % \
                (self.num, self.course_num, self.rdate,
                 self.mround1, self.mround2, self.mround3)
 
     def __str__(self):
-        return "Round[%d]: course=%d, %s, %d/%d/%d" % \
+        return "Round[%d]: course=%s, %s, %d/%d/%d" % \
                (self.num, self.course_num, self.rdate,
                 self.mround1, self.mround2, self.mround3)
 
@@ -490,9 +493,10 @@ def modify_round(rnd, rd_list):
         dprint(rd)
     dprint("Tryig to udate DB for:", rnd)
     db_cmd_exec('''UPDATE rounds
-                   SET mround1=%d,mround2=%d,mround3=%d
+                   SET course_num=%d,rdate="%s",mround1=%d,mround2=%d,mround3=%d
                    WHERE num=%d''' % \
-                (rnd.mround1, rnd.mround2, rnd.mround3, rnd.num))
+                (rnd.course_num, rnd.rdate.strftime("%m/%d/%Y"),
+                 rnd.mround1, rnd.mround2, rnd.mround3, rnd.num))
     for rd in rd_list:
         dprint("Trying to update DB for:", rd)
         db_cmd_exec('''UPDATE round_details

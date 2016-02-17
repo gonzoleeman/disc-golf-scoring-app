@@ -90,8 +90,8 @@ round_details_preload_list = [
     # fields:
     # 1. round_num (JOIN from rounds.num)	\_ ** KEY **
     # 2.  player_num (JOIN from player.num)	/
-    # 3.   fscore					- front score over/under
-    # 4.    bscore					- back score over/under
+    # 3.   fstrokes					- front score over/under
+    # 4.    bstrokes					- back score over/under
     # 5.     acnt					- ace count
     # 6.      ecnt					- eagle count
     # 7.       aecnt				- ace-eagle count
@@ -227,8 +227,8 @@ def initialize_rounds(c, create_empty=False):
     db_cmd_exec(c, '''CREATE TABLE round_details (
     				  round_num INTEGER,
                                   player_num INTEGER,
-                                  fscore SMALLINT,
-                                  bscore SMALLINT,
+                                  fstrokes SMALLINT,
+                                  bstrokes SMALLINT,
                                   acnt SMALLINT,
                                   ecnt SMALLINT,
                                   aecnt SMALLINT,

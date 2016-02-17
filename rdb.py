@@ -106,15 +106,15 @@ class RoundDetail:
     '''
     One entry for one person for one round (which is one course on one day)
     '''
-    def __init__(self, rnum, pnum, fscore=None, bscore=None,
+    def __init__(self, rnum, pnum, fstrokes=None, bstrokes=None,
                  acnt=0, ecnt=0, aecnt=0,
                  calc_fscore=None, calc_bscore=None, calc_oscore=None):
         self.round_num = int(rnum)
         self.player_num = int(pnum)
         # these are the round score: front and back
         # (we allow these to be "None", meaning "not yet filled in")
-        self.fscore = fscore
-        self.bscore = bscore
+        self.fstrokes = fstrokes
+        self.bstrokes = bstrokes
         # ace, eagle, and ace-eagle counts
         self.acnt = acnt
         self.ecnt = ecnt
@@ -131,7 +131,7 @@ class RoundDetail:
         if self.player_num != other.player_num:
             dprint("compare round detail: player_num NOT EQUAL")
             return self.player_num - other.player_num
-        for fname in ['fscore', 'bscore']:
+        for fname in ['fstrokes', 'bstrokes']:
             s = getattr(self, fname)
             o = getattr(other, fname)
             if s != o:
@@ -165,20 +165,20 @@ class RoundDetail:
         dprint("compare round detail: *** EQUAL ***")
         return 0
 
-    def SetScore(self, fscore, bscore):
-        self.fscore = int(fscore)
-        self.bscore = int(bscore)
+    def SetScore(self, fstrokes, bstrokes):
+        self.fstrokes = int(fstrokes)
+        self.bstrokes = int(bstrokes)
 
     def SetCounts(self, acnt, ecnt, aecnt):
         self.acnt = acnt
         self.ecnt = ecnt
         self.aecnt = aecnt
 
-    def Overall(self):
+    def OverallStrokes(self):
         '''Return overall, assuming round has been scored'''
-        if self.fscore is None or self.bscore is None:
+        if self.fstrokes is None or self.bstrokes is None:
             return None
-        return self.fscore + self.bscore
+        return self.fstrokes + self.bstrokes
 
     def CalcScore(self):
         '''The Total score: front+back+overall'''
@@ -210,14 +210,14 @@ class RoundDetail:
 
     def __repr__(self):
         return "RoundDetail(%d, %d, %s, %s, %d, %d, %d, %s, %s, %s)" \
-               (self.player_num, self.fscore, self.bscore,
+               (self.player_num, self.fstrokes, self.bstrokes,
                 self.acnt, self.ecnt, self.aecnt,
                 self.calc_fscore, self.calc_bscore, self.calc_oscore)
 
     def __str__(self):
         return "RoundDetail[]: rnd=%d, " % self.round_num + \
-               "pnum=%d, fscore=%s, bscore=%s, " % \
-               (self.player_num, self.fscore, self.bscore) + \
+               "pnum=%d, fstrokes=%s, bstrokes=%s, " % \
+               (self.player_num, self.fstrokes, self.bstrokes) + \
                "a/e/ae=%d/%d/%d => %s|%s|%s" % \
                (self.acnt, self.ecnt, self.aecnt,
                 self.calc_fscore, self.calc_bscore, self.calc_oscore)
@@ -267,7 +267,7 @@ class MoneyRoundDetail:
         self.moola_rnd = mrnds
 
     def GetMoney(self):
-        return self.moola_rnd[0] + self.moola_rnd[1] + self.moola_rnd[2]
+        return sum(self.moola_rnd, Money(0))
 
     def __repr__(self):
         return "MoneyRoundDetail(%d, %d, %s)" % \
@@ -282,8 +282,13 @@ class MoneyRoundDetail:
 class SearchResult:
     '''
     Used to gather data about how each player did over a period of time.
-    
-    i.e. this is what each entry in the search results looks like
+
+    There is an instance of this class for each player being reported on.
+    The class starts out with "empty" results, and then for each round
+    detail found for that same player, AddRoundResults() is called, so that
+    at the end, the instance will have the summary of how that player
+    did during the reporting period. Note that AddMoneyRoundResults() has
+    also been added, to track money round results, separately.
     '''
     def __init__(self, pnum):
         dprint("Creating empty Search Result for pnum=%d" % pnum)
@@ -298,14 +303,17 @@ class SearchResult:
         self.won_9s = 0          # best on 9 holes
         self.won_18s = 0         # best on 18 holes
         self.won_33s = 0         # best on both 9 and on 18 (33 pts)
-        self.best_fscore = MyFraction(999)  # best score seen on front 9
-        self.best_bscore = MyFraction(999)   # best score seen on back 9
+        self.best_fstrokes = 999   # best score seen on front 9
+        self.best_bstrokes = 999   # best score seen on back 9
         self.money_won = Money(0)
 
     def TotalPoints(self):
         return self.front_pts + self.back_pts + self.overall_pts
 
-    def AddResults(self, rd):
+    def AddRoundResults(self, rd):
+        '''
+        The heart of summarizing results
+        '''
         dprint("*** Adding in results for pnum=%d:" % self.pnum, rd)
         if self.pnum != rd.player_num:
             raise Exception("Internal Error: Player Number Mismatch")
@@ -333,19 +341,22 @@ class SearchResult:
         if rd.CalcScore() == MyFraction(33):
             dprint("Won an 33!")
             self.won_33s += 1
-        if rd.fscore < self.best_fscore:
-            self.best_fscore = rd.fscore
-            dprint("Set best front score to:", self.best_fscore)
-        if rd.bscore < self.best_bscore:
-            self.best_bscore = rd.bscore
-            dprint("Set best back score to:", self.best_bscore)
-        # find the money round detail that matches this round detail
-        for mrd in MoneyRoundDetailList:
-            if rd.round_num == mrd.round_num and \
-               rd.player_num == mrd.player_num:
-                self.money_won += mrd.GetMoney()
-                dprint("Added $%s, total now $%s" % (mrd.GetMoney(),
-                                                     self.money_won))
+        if rd.fstrokes < self.best_fstrokes:
+            self.best_fstrokes = rd.fstrokes
+            dprint("Set best front score to:", self.best_fstrokes)
+        if rd.bstrokes < self.best_bstrokes:
+            self.best_bstrokes = rd.bstrokes
+            dprint("Set best back score to:", self.best_bstrokes)
+
+    def AddMoneyRoundResults(self, mrd):
+        '''
+        The second heart of summarizing results: the money
+        '''
+        dprint("*** Adding in money results for pnum=%d:" % self.pnum, mrd)
+        if self.pnum != mrd.player_num:
+            raise Exception("Internal Error: Player Number Mismatch")
+        self.money_won += mrd.GetMoney()
+        dprint("Added $%s, total now $%s" % (mrd.GetMoney(), self.money_won))
 
     def PointsPerRound(self):
         return self.TotalPoints() / self.rnd_cnt
@@ -358,7 +369,7 @@ class SearchResult:
                (self.acnt, self.ecnt, self.aecnt) + \
                "9s/18s/33s=%d/%d/%d, " % \
                (self.won_9s, self.won_18s, self.won_33s) + \
-               "best f/r=%+d/%+d, " % (self.best_fscore, self.best_bscore) + \
+               "best f/r=%+d/%+d, " % (self.best_fstrokes, self.best_bstrokes) + \
                "%s" % self.money_won
 
 
@@ -465,8 +476,8 @@ def init_rounds():
     for row in db_cmd_exec('SELECT * from round_details'):
         round_num = row['round_num']
         player_num = row['player_num']
-        fscore = row['fscore']
-        bscore = row['bscore']
+        fstrokes = row['fstrokes']
+        bstrokes = row['bstrokes']
         acnt = row['acnt']
         ecnt = row['ecnt']
         aecnt = row['aecnt']
@@ -478,13 +489,13 @@ def init_rounds():
         oscore_den = row['calc_oscore_denominator']
         dprint("Adding round detail: " +
                "rnd_num=%d, p_num=%d, " % (round_num, player_num) +
-               "fscore=%d, bscore=%d, " % (fscore, bscore) +
+               "fstrokes=%d, bstrokes=%d, " % (fstrokes, bstrokes) +
                "a/e/ae=%d/%d/%d, score=%d/%d|%d/%d|%d/%d, " % \
                (acnt, ecnt, aecnt,
                 fscore_num, fscore_den,
                 bscore_num, bscore_den,
                 oscore_num, oscore_den))
-        rd = RoundDetail(round_num, player_num, fscore, bscore,
+        rd = RoundDetail(round_num, player_num, fstrokes, bstrokes,
                          acnt, ecnt, aecnt,
                          MyFraction(fscore_num, fscore_den),
                          MyFraction(bscore_num, bscore_den),
@@ -554,7 +565,7 @@ def add_round(rnd, rd_list):
         if rnd.num != rd.round_num:
             raise Exception("Internal Error: Round Number mismatch!")
         db_cmd_exec('''INSERT INTO round_details(round_num, player_num,
-                                                 fscore, bscore,
+                                                 fstrokes, bstrokes,
                                                  acnt, ecnt, aecnt,
                                                  calc_fscore_numerator,
                                                  calc_fscore_denominator,
@@ -564,7 +575,7 @@ def add_round(rnd, rd_list):
                                                  calc_oscore_denominator)
                VALUES(%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)''' % \
                     (rd.round_num, rd.player_num,
-                     rd.fscore, rd.bscore,
+                     rd.fstrokes, rd.bstrokes,
                      rd.acnt, rd.ecnt, rd.aecnt,
                      rd.calc_fscore.numerator, rd.calc_fscore.denominator,
                      rd.calc_bscore.numerator, rd.calc_bscore.denominator,
@@ -586,7 +597,7 @@ def modify_round(rnd, rd_list):
     for rd in rd_list:
         dprint("Trying to update DB for:", rd)
         db_cmd_exec('''UPDATE round_details
-                       SET fscore=%d,bscore=%d,
+                       SET fstrokes=%d,bstrokes=%d,
                            acnt=%d,ecnt=%d,aecnt=%d,
                            calc_fscore_numerator=%d,
                            calc_fscore_denominator=%d,
@@ -595,7 +606,7 @@ def modify_round(rnd, rd_list):
                            calc_oscore_numerator=%d,
                            calc_oscore_denominator=%d
                        WHERE round_num=%d AND player_num=%d''' % \
-                    (rd.fscore, rd.bscore,
+                    (rd.fstrokes, rd.bstrokes,
                      rd.acnt, rd.ecnt, rd.aecnt,
                      rd.calc_fscore.numerator, rd.calc_fscore.denominator,
                      rd.calc_bscore.numerator, rd.calc_bscore.denominator,

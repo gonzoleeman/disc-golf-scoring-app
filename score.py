@@ -22,18 +22,19 @@ def score_round(rd_list):
     dprint("score_round: *** ENTERING ***")
 
     # get sorted round lists
-    front_list = sorted(rd_list, key=lambda rd: rd.fscore)
-    front_score_list = sorted([rd.fscore for rd in front_list])
+    front_list = sorted(rd_list, key=lambda rd: rd.fstrokes)
+    front_score_list = sorted([rd.fstrokes for rd in front_list])
     front_score_results = calculate_score(front_score_list, ROUND_SCORES)
 
     # fill in front_list with front-9 totals
-    back_list = sorted(rd_list, key=lambda rd: rd.bscore)
-    back_score_list = sorted([rd.bscore for rd in back_list])
+    back_list = sorted(rd_list, key=lambda rd: rd.bstrokes)
+    back_score_list = sorted([rd.bstrokes for rd in back_list])
     back_score_results = calculate_score(back_score_list, ROUND_SCORES)
 
     # fill in back_list with back-9 totals
-    ttl_list = sorted(rd_list, key=lambda rd: rd.Overall())
-    ttl_score_list = sorted([rd.Overall() for rd in ttl_list])
+    ttl_list = sorted(rd_list, key=lambda rd: rd.OverallStrokes())
+    # XXX is this step redundant to the one just above?
+    ttl_score_list = sorted([rd.OverallStrokes() for rd in ttl_list])
     ttl_score_results = calculate_score(ttl_score_list, OVERALL_SCORES)
 
     # fill in ttl_list with overall totals by adding all 3 lists

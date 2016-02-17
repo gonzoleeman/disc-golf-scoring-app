@@ -577,7 +577,8 @@ class RoundDetailsFrame(wx.Frame):
             dprint(rd)
             player = rdb.PlayerList[rd.player_num]
             self.item_data[rd.player_num] = (player.name,
-                                             rd.fscore, rd.bscore, rd.Overall(),
+                                             rd.fstrokes, rd.bstrokes,
+                                             rd.OverallStrokes(),
                                              rd.acnt, rd.ecnt, rd.aecnt,
                                              rd.CalcScore())
             dprint("Set item_data[%d] to" % rd.player_num,

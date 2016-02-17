@@ -14,7 +14,7 @@ import listctrl as lc
 import wxdate
 import money_rounds
 import score
-import money
+from money import Money
 
 
 class ScoreResultsFrame(wx.Frame):
@@ -29,6 +29,7 @@ class ScoreResultsFrame(wx.Frame):
         self.stop_rdate = None
         self.match_count = 0
         self.round_count = 0
+        self.mz_kitty_amt = Money(0)
 
     def MyStart(self, start_rdate, stop_rdate):
         dprint("ScoreResultsFrame:MyStart(%s, %s): entering" % \
@@ -53,11 +54,11 @@ class ScoreResultsFrame(wx.Frame):
         hbox1.Add(st1, flag=wx.TOP|wx.LEFT|wx.RIGHT, border=10)
         vbox.Add(hbox1, flag=wx.CENTER|wx.ALIGN_CENTER)
         ################################################################
-        vbox.AddSpacer(10)
+        vbox.AddSpacer(20)
         sl = wx.StaticLine(panel, size=wx.Size(400, 1))
         vbox.Add(sl, flag=wx.CENTER|wx.ALIGN_CENTER)
         ################################################################
-        vbox.AddSpacer(15)
+        vbox.AddSpacer(25)
         hbox3 = wx.BoxSizer(wx.HORIZONTAL)
         dprint("Setting up message on date ranges")
         dprint("Start:", self.start_rdate)
@@ -69,22 +70,22 @@ class ScoreResultsFrame(wx.Frame):
                          (self.start_rdate.strftime("%m/%d/%Y"),
                           self.stop_rdate.strftime("%m/%d/%Y"))
         st2 = wx.StaticText(panel, label=date_range_msg)
-        matches_msg = "Records Found: %d" % self.match_count
+        matches_msg = "Players Found: %d" % self.match_count
         st3 = wx.StaticText(panel, label=matches_msg)
         rounds_msg = "Rounds Found: %s" % (self.round_count)
         st4 = wx.StaticText(panel, label=rounds_msg)
-        mz_kitty_msg = "Amount for Mz Kitty: $%5s" % money.Money(0)
-        st5 = wx.StaticText(panel, mz_kitty_msg)
+        st5 = wx.StaticText(panel, label=self.MzKittyMsg())
+        hbox3.AddSpacer(15)
         hbox3.Add(st2)
         hbox3.AddSpacer(40)
         hbox3.Add(st3)
         hbox3.AddSpacer(40)
         hbox3.Add(st4)
-        hbox3.AddStretchSpacer(1)
+        hbox3.AddSpacer(40)
         hbox3.Add(st5)
-        vbox.Add(hbox3)
+        vbox.Add(hbox3, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
         ################################################################
-        vbox.AddSpacer(15)
+        #vbox.AddSpacer(15)
         hbox2 = wx.BoxSizer(wx.HORIZONTAL)
         self.results_list = lc.AutoWidthListCtrl(panel)
         self.results_list.SetupListHdr(\
@@ -105,6 +106,9 @@ class ScoreResultsFrame(wx.Frame):
         pub.subscribe(self.OnNewRoundExists, "ROUND UPDATE")
         pub.subscribe(self.OnNewRoundExists, "MONEY ROUND UPDATE")
 
+    def MzKittyMsg(self):
+        return "Amount for Mz Kitty: $%5s" % self.mz_kitty_amt
+
     def OnNewRoundExists(self, message):
         '''A "NEW ROUND" message has been received'''
         dprint("ScoreResultsFrame: A 'NEW ROUND' Message we received!")
@@ -122,38 +126,79 @@ class ScoreResultsFrame(wx.Frame):
                self.start_rdate, ", to:", self.stop_rdate)
         dprint("Report Starting Date (as datetime):", self.start_rdate)
         dprint("Report Ending Date (as datetime):  ", self.stop_rdate)
-        # make a dictionary of the entries in range
+        # make a dictionary of the entries in range, where the 'key'
+        # is the player number, and the data is an instance of
+        # SearchResult for that player
         matches_found = {k: rdb.SearchResult(v.num) \
                          for k,v in rdb.PlayerList.iteritems()}
         self.item_data = {}
-        # also keep track of unique rounds seen
-        rounds_seen = {}
+        # also keep track of unique rounds seen, using a key of
+        # the round number, and data of True
+        round_numbers_seen = {}
         for rd in rdb.RoundDetailList:
-            dprint("Looking at:", rd)
+            dprint("Results: Looking at:", rd)
             rnd = rdb.RoundList[rd.round_num]
             dprint("From:      ", rnd)
             if not (self.start_rdate <= rnd.rdate <= self.stop_rdate):
                 continue
             dprint("Found a match, round no %d" % rd.round_num)
-            matches_found[rd.player_num].AddResults(rd)
-            rounds_seen[rd.round_num] = True
-        # fill in data for our GUI list
+            matches_found[rd.player_num].AddRoundResults(rd)
+            round_numbers_seen[rd.round_num] = True
+        # now go through the money rounds, to add up money for each player,
+        # and to keep track of the number of players per round
+        players_per_round = {}
+        for mrd in rdb.MoneyRoundDetailList:
+            dprint("Results: Looking at:", mrd)
+            round_num = mrd.round_num
+            if round_num not in round_numbers_seen:
+                dprint("Skipping this entry: round# not in range:", round_num)
+                continue
+            dprint("Found a match, round no %d" % rd.round_num)
+            # increment the number of players for this round
+            player_num = mrd.player_num
+            cur_cnt = players_per_round.get(round_num, 0)
+            players_per_round[round_num] = cur_cnt + 1
+            dprint("Now players_per_round[%d] = %d" % \
+                   (round_num, cur_cnt+1))
+            # now add in the money data for this player
+            matches_found[mrd.player_num].AddMoneyRoundResults(mrd)
+        dprint("List of players per round:", players_per_round)
+        # finally, get the total for mz kitty
+        for round_num in round_numbers_seen:
+            dprint("Scanning money round for round_num=%d" % round_num)
+            mrnd = rdb.MoneyRoundList[round_num]
+            dprint("Found:", mrnd)
+            num_players = players_per_round[round_num]
+            dprint("Found %d players for this round" % num_players)
+            for try_no in mrnd.mrounds:
+                # XXX 7? really? make a constant!
+                if try_no == 7:
+                    add_amt = Money(num_players)
+                    dprint("*** Found Money for mz kitty, " + \
+                           "round=%d, try=%d, amt=%s" % \
+                           (round_num, try_no, add_amt))
+                    self.mz_kitty_amt += add_amt
+        # fill in item data for our GUI list: 1:1 from matches found
         for pnum,sr in matches_found.iteritems():
-            dprint("Found match[%d]:" % pnum, sr)
-            if sr.rnd_cnt > 0:
-                pname = rdb.PlayerList[sr.pnum].name
-                self.item_data[pnum] = (pname, sr.rnd_cnt, sr.TotalPoints(),
-                                        sr.PointsPerRound(),
-                                        sr.acnt, sr.ecnt, sr.aecnt,
-                                        sr.won_9s, sr.won_18s,
-                                        sr.won_33s,
-                                        sr.best_fscore, sr.best_bscore,
-                                        sr.money_won)
-                dprint("Created data item:", self.item_data[pnum])
-        # keep track of number of matches
+            dprint("Found match[player_num=%d]:" % pnum, sr)
+            if sr.rnd_cnt <= 0:
+                # this player did not play any rounds
+                dprint("Skipping this player, since they did not play")
+                continue
+            pname = rdb.PlayerList[sr.pnum].name
+            self.item_data[pnum] = (pname, sr.rnd_cnt, sr.TotalPoints(),
+                                    sr.PointsPerRound(),
+                                    sr.acnt, sr.ecnt, sr.aecnt,
+                                    sr.won_9s, sr.won_18s,
+                                    sr.won_33s,
+                                    sr.best_fstrokes, sr.best_bstrokes,
+                                    sr.money_won)
+            dprint("Created data item:", self.item_data[pnum])
+        # keep track of number of matches and number of rounds seen
         self.match_count = len(self.item_data)
-        self.round_count = len(rounds_seen)
-        dprint("=> Rounds seen (cnt=%d):" % self.round_count, rounds_seen)
+        self.round_count = len(round_numbers_seen)
+        dprint("=> Rounds seen (cnt=%d):" % self.round_count,
+               round_numbers_seen)
 
     def Quit(self, e):
         dprint("Quit? Really?")
@@ -167,6 +212,9 @@ class ScoreResultsFrame(wx.Frame):
 class ReportSetupFrame(wx.Frame):
     '''
     Called when the main-frame menu item "reports" is chosen
+
+    This lets us choose the parameters for our report, i.e.
+    the date range.
     '''
     def __init__(self, *args, **kwargs):
         super(ReportSetupFrame, self).__init__(*args, **kwargs)

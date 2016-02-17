@@ -5,6 +5,18 @@ Python script to present a Disc Golf GUI, that allows
 us to keep track of courses and holes on that course
 
 TO DO:
+    - ReportFrame needs a "done" button?
+
+    - A Way to get directly to an existing money round, without having
+      to go through the round?
+    
+    - Disallow selection of report list (for now), since it adds no
+      value, and could be misleading. Some day, this might pop up details
+      about that person?
+
+    - Rename front 9 and back 9 fields to "strokes" instead of "score",
+      for God sake
+
     - Disallow duplicate frames, e.g. for Round Scoring, choosing a round,
       money round scoring. more than one report frame should be ok
 
@@ -15,12 +27,6 @@ TO DO:
       But of course if the date is not changed, it will match
       one and only one entry in the db, which corresponds to
       this round.
-
-    - Always show "Mz Kitty" on results, in case she won money?
-      (or only if she won money?)
-
-      PROBLEM: how to know how many people (or how much money) is in
-      each money round, as some folks don not play the money round???
 
     - Question: For counting 9-s, 18-s, and 33-s, what if, for example,
       somebody ties on the front 9. Do both folks get 9-s?
@@ -34,7 +40,7 @@ TO DO:
       e.g. have a drop-down radio-button list in the menu for each
       of the 18 hole -- hopefully not needed, except for by Gary
 
-    - Add option to backup the DB. (Periodically, or on demand?)
+    - Add option to backup the DB. (Periodically, or on demand)
 
     - Allow update of DB any time, but warn user that "calc is needed"
       if they have updated a front or back 9 score
@@ -45,9 +51,6 @@ TO DO:
     - Break main status window into 2 parts: the first is the file
       name of the database, and the 2nd is for error messages
       (for which frame(s)?)
-
-    - Add "number of records matched" to ScoreResults Frame, possibly
-      in a (new) status window? -- NO, I do not think this is needed
 
     - As soon as any field changed in the Scoring GUI, update
       the status window to say "Edited"
@@ -119,9 +122,18 @@ History:
         * update report window if round(s) updated
         * cleaned up money parsing debugging
         * cleaned up money reporting bugs
-    verssion 1.15:
+    version 1.15:
         * Now displaying report date range and record counts
         * Date and course now saved/updated/displayed in scoring frame
+    version 1.16:
+        * Now keeps track of mz kitty, on report screen, which
+          took quite a bit of re-arranging, including breaking
+          the round table into two: round and money round, and
+          doing the same for the round detail, now round detail and
+          money round detail. Assume that mz kitty only ges money
+          if the round try-number field is "7", and then assume
+          the number of players is the number you find in the
+          money round detail table for that money round.
 '''
 
 
@@ -137,7 +149,7 @@ import rounds
 
 
 __author__ = "Lee Duncan"
-__version__ = "1.15"
+__version__ = "1.16"
 
 
 ################################################################

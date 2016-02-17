@@ -22,7 +22,7 @@ DATE_RANGES = ['<Choose a Range>',
                'All Time']
 
 def wxdt_create(day=None, month=None, year=None):
-    res = wxdt()
+    res = wxdt.Today()
     if day is not None:
         res.SetDay(day)
     if month is not None:
@@ -57,7 +57,7 @@ def range_from_key(key):
     elif key == 'Last Year':
         dprint("Using 1/1/LASTYEAR to 12/31/LASTYEAR")
         last_yr = wxdt.Today().GetYear() - 1
-        dt_start = wxdt_create(1, 0, last_year)
+        dt_start = wxdt_create(1, 0, last_yr)
         dt_end = wxdt_create(31, 11, last_yr)
     elif key == 'Last Month':
         dprint("Using Beginning to end of Last month")

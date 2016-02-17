@@ -92,7 +92,9 @@ def calculate_score(score_list, score_values):
     results = []
     idx = 0
     for score_val in sorted(scores_seen.keys()):
+        dprint("calculate_score: score_val:", score_val)
         num_at_place = scores_seen[score_val]
+        dprint("calculate_score: num_at_place:", num_at_place)
         dprint("Looking at score=%d,cnt=%s at place: %d" % \
                (score_val, num_at_place, (idx + 1)))
         if num_at_place == 1:

@@ -1,19 +1,10 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
 '''
 Python ride database class
 
  these classes represent the
  the disc golf course database
-
- There are three classes:
- * Course,
- * Player, and
- * Round
-
- Which will populate 3 dictionary tables:
- * CourseList,
- * PlayerList, and
- * RoundList
 
 Designed to use a plugable backend (using classes), but using
 a file backend to start
@@ -40,6 +31,9 @@ class Course:
         self.num = cnum
         self.name = cname
 
+    def __repr__(self):
+        return "Course(%d, %s)" % (self.cnum, self.name)
+
     def __str__(self):
         return "Course[%d]: %s" % (self.num, self.name)
 
@@ -52,6 +46,10 @@ class Player:
         self.name = sname
         self.full_name = lname
 
+    def __repr__(self):
+        return "Player(%d, %s, %s)" % \
+               (self.num, self.full_name, self.name)
+
     def __str__(self):
         return "Player[%d]: %s (%s)" % \
                (self.num, self.full_name, self.name)
@@ -61,30 +59,48 @@ class Round:
     '''
     One round, not counting the individual scores
     '''
-    def __init__(self, rnum, cnum=None, rdate_str=None,
-                 mround1=0, mround2=0, mround3=0):
+    def __init__(self, rnum, cnum=None, rdate_str=None):
         self.num = int(rnum)
         self.course_num = None if cnum is None else int(cnum)
         # rdate is type: datetime.datetime()
         dprint("Setting rdate from:", rdate_str)
         self.rdate = None if rdate_str is None else parse_date_str(rdate_str)
-        # what try it took for an ace (0 -> none, 7 -> mzKitty)
-        self.mround1 = mround1
-        self.mround2 = mround2
-        self.mround3 = mround3
 
     def SetDate(self, rdate_str):
         self.rdate = parse_date_str(rdate_str)
 
     def __repr__(self):
-        return "Round(%d, %s, %s, %d, %d, %d)" % \
-               (self.num, self.course_num, self.rdate,
-                self.mround1, self.mround2, self.mround3)
+        return "Round(%d, %s, %s)" % \
+               (self.num, self.course_num, self.rdate)
 
     def __str__(self):
-        return "Round[%d]: course=%s, %s, %d/%d/%d" % \
-               (self.num, self.course_num, self.rdate,
-                self.mround1, self.mround2, self.mround3)
+        return "Round[%d]: course=%s, %s" % \
+               (self.num, self.course_num, self.rdate)
+
+
+class MoneyRound:
+    '''
+    For each time a person plays for money after a normal round
+    '''
+    def __init__(self, rnum, mround1=0, mround2=0, mround3=0):
+        self.round_num = int(rnum)
+        # what try it took for an ace (0 -> none, 7 -> mzKitty)
+        num_range = range(8)            # [0..7]
+        self.mrounds = [mround1, mround2, mround3]
+        for mround in self.mrounds:
+            if mround not in num_range:
+                raise Exception("Internal Error: Money Round out of range")
+
+    def __repr__(self):
+        return "MoneyRound(%d, %s)" % (self.round_num, self.mround)
+
+    def __str__(self):
+        return "MoneyRound[%d]: Try# = %d/%d/%d" % \
+               (self.round_num,
+                self.mrounds[0],
+                self.mrounds[1],
+                self.mrounds[2])
+
 
 class RoundDetail:
     '''
@@ -92,8 +108,7 @@ class RoundDetail:
     '''
     def __init__(self, rnum, pnum, fscore=None, bscore=None,
                  acnt=0, ecnt=0, aecnt=0,
-                 calc_fscore=None, calc_bscore=None, calc_oscore=None,
-                 moola_rnd1=None, moola_rnd2=None, moola_rnd3=None):
+                 calc_fscore=None, calc_bscore=None, calc_oscore=None):
         self.round_num = int(rnum)
         self.player_num = int(pnum)
         # these are the round score: front and back
@@ -108,10 +123,6 @@ class RoundDetail:
         self.calc_fscore = MyFraction(0) if calc_fscore is None else calc_fscore
         self.calc_bscore = MyFraction(0) if calc_bscore is None else calc_bscore
         self.calc_oscore = MyFraction(0) if calc_oscore is None else calc_oscore
-        # money round: amount of money won
-        self.moola_rnd1 = Money(0) if moola_rnd1 is None else moola_rnd1
-        self.moola_rnd2 = Money(0) if moola_rnd2 is None else moola_rnd2
-        self.moola_rnd3 = Money(0) if moola_rnd3 is None else moola_rnd3
 
     def __cmp__(self, other):
         if self.round_num != other.round_num:
@@ -143,22 +154,13 @@ class RoundDetail:
             o = getattr(other, fname)
             if s > o:
                 dprint("compare round detail: %s (s>o) NOT EQUAL" % fname)
+                dprint("self.%s:" % fname, s)
+                dprint("other.%s:" % fname, o)
                 return 1
             if s < o:
                 dprint("compare round detail: %s (s<o) NOT EQUAL" % fname)
-                return -1
-        for fname in ['moola_rnd1', 'moola_rnd2', 'moola_rnd3']:
-            s = getattr(self, fname)
-            o = getattr(other, fname)
-            if s > o:
-                dprint("compare round detail: %s (s>o) NOT EQUAL" % fname)
-                dprint("s:", s)
-                dprint("o:", o)
-                return 1
-            if s < o:
-                dprint("compare round detail: %s (s<o) NOT EQUAL" % fname)
-                dprint("s:", s)
-                dprint("o:", o)
+                dprint("self.%s:" % fname, s)
+                dprint("other.%s:" % fname, o)
                 return -1
         dprint("compare round detail: *** EQUAL ***")
         return 0
@@ -171,14 +173,6 @@ class RoundDetail:
         self.acnt = acnt
         self.ecnt = ecnt
         self.aecnt = aecnt
-
-    def SetMoney(self, mr1, mr2, mr3):
-        self.moola_rnd1 = mr1
-        self.moola_rnd2 = mr2
-        self.moola_rnd3 = mr3
-
-    def GetMoney(self):
-        return self.moola_rnd1 + self.moola_rnd2 + self.moola_rnd3
 
     def Overall(self):
         '''Return overall, assuming round has been scored'''
@@ -215,20 +209,75 @@ class RoundDetail:
         dprint("Set overall score to %s" % score)
 
     def __repr__(self):
-        return "RoundDetail(%d, %d, %s, %s, %d, %d, %d, %s, %s, %s, %s, %s, %s)" \
+        return "RoundDetail(%d, %d, %s, %s, %d, %d, %d, %s, %s, %s)" \
                (self.player_num, self.fscore, self.bscore,
                 self.acnt, self.ecnt, self.aecnt,
-                self.calc_fscore, self.calc_bscore, self.calc_oscore,
-                self.moola_rnd1, self.moola_rnd2, self.moola_rnd3)
+                self.calc_fscore, self.calc_bscore, self.calc_oscore)
 
     def __str__(self):
         return "RoundDetail[]: rnd=%d, " % self.round_num + \
                "pnum=%d, fscore=%s, bscore=%s, " % \
                (self.player_num, self.fscore, self.bscore) + \
-               "a/e/ae=%d/%d/%d => %s|%s|%s, Money=%s,%s,%s" % \
+               "a/e/ae=%d/%d/%d => %s|%s|%s" % \
                (self.acnt, self.ecnt, self.aecnt,
-                self.calc_fscore, self.calc_bscore, self.calc_oscore,
-                self.moola_rnd1, self.moola_rnd2, self.moola_rnd3)
+                self.calc_fscore, self.calc_bscore, self.calc_oscore)
+
+class MoneyRoundDetail:
+    '''
+    Detail for one player on one day, during the money part of the
+    day
+
+    For every one of these, there should be a Roundetail, but there
+    can be a RoundDetail without a MoneyRoundDetail, if a player did
+    not play in the money round on a given day, even though they
+    played the regular 18-holes.
+    '''
+    def __init__(self, rnum, pnum,
+                 moola_rnd1=None, moola_rnd2=None, moola_rnd3=None):
+        self.round_num = int(rnum)
+        self.player_num = int(pnum)
+        # money round: amount of money won
+        self.moola_rnd = [0 for i in range(3)]
+        self.moola_rnd[0] = Money(0) if moola_rnd1 is None else moola_rnd1
+        self.moola_rnd[1] = Money(0) if moola_rnd2 is None else moola_rnd2
+        self.moola_rnd[2] = Money(0) if moola_rnd3 is None else moola_rnd3
+
+    def __cmp__(self, other):
+        for i in range(3):
+            s = self.moola_rnd[i]
+            o = other.moola_rnd[i]
+            if s > o:
+                dprint("compare money round detail: " + \
+                       "moola_rnd[%d] (s>o) NOT EQUAL" % i)
+                dprint("s:", s)
+                dprint("o:", o)
+                return 1
+            if s < o:
+                dprint("compare money round detail: " + \
+                       "moola_rnd[%d] (s<o) NOT EQUAL" % i)
+                dprint("s:", s)
+                dprint("o:", o)
+                return -1
+        dprint("compare money round detail: *** EQUAL ***")
+        return 0
+
+    def SetMoney(self, mrnds):
+        if len(mrnds) != 3:
+            raise Exception("Internal Error: need money for 3 rounds")
+        self.moola_rnd = mrnds
+
+    def GetMoney(self):
+        return self.moola_rnd[0] + self.moola_rnd[1] + self.moola_rnd[2]
+
+    def __repr__(self):
+        return "MoneyRoundDetail(%d, %d, %s)" % \
+               (self.round_num, self.player_num, self.moola_rnd)
+
+    def __str__(self):
+        return "MoneyRoundDetail[]: rnd=%d, pnum=%d, Money=%s/%s/%s)" % \
+               (self.round_num, self.player_num,
+                self.moola_rnd[0], self.moola_rnd[1], self.moola_rnd[2])
+
 
 class SearchResult:
     '''
@@ -257,7 +306,7 @@ class SearchResult:
         return self.front_pts + self.back_pts + self.overall_pts
 
     def AddResults(self, rd):
-        dprint("Adding in results for pnum=%d:" % self.pnum, rd)
+        dprint("*** Adding in results for pnum=%d:" % self.pnum, rd)
         if self.pnum != rd.player_num:
             raise Exception("Internal Error: Player Number Mismatch")
         self.rnd_cnt += 1
@@ -290,8 +339,13 @@ class SearchResult:
         if rd.bscore < self.best_bscore:
             self.best_bscore = rd.bscore
             dprint("Set best back score to:", self.best_bscore)
-        self.money_won += rd.GetMoney()
-        dprint("Added $%s, total now $%s" % (rd.GetMoney(), self.money_won))
+        # find the money round detail that matches this round detail
+        for mrd in MoneyRoundDetailList:
+            if rd.round_num == mrd.round_num and \
+               rd.player_num == mrd.player_num:
+                self.money_won += mrd.GetMoney()
+                dprint("Added $%s, total now $%s" % (mrd.GetMoney(),
+                                                     self.money_won))
 
     def PointsPerRound(self):
         return self.TotalPoints() / self.rnd_cnt
@@ -312,12 +366,14 @@ DB_DIR = 'db'
 DB_FILE = 'disc_golf.db'
 DB_PATH = "%s/%s" % (DB_DIR, DB_FILE)
 
-# our internal representation of a database, using dictionaries
+# our internal representation of a database, using (mostly) dictionaries
 CourseList = {}
 PlayerList = {}
 RoundList = {}
-# the detail list is not indexed by a number, so it's an array
+MoneyRoundList = {}
+# the detail lists are not indexed by a number, so they are just arrays
 RoundDetailList = []
+MoneyRoundDetailList = []
 
 DBConn = None
 DBc = None
@@ -341,8 +397,8 @@ def init_courses():
     dprint("Initializing Disc Golf Courses ...")
     CourseList = {}
     for row in db_cmd_exec('SELECT * FROM courses'):
-        course_num = row[0]
-        course_name = row[1]
+        course_num = row['num']
+        course_name = row['name']
         dprint("Adding course[%d]: name=%s" % (course_num, course_name))
         CourseList[course_num] = Course(course_num, course_name)
 
@@ -354,7 +410,9 @@ def init_players():
     dprint("Initializing Disc Golf Players ...")
     PlayerList = {}
     for row in db_cmd_exec('SELECT * FROM players'):
-        (player_num, player_name, player_full_name) = row[0:3]
+        player_num = row['num']
+        player_name = row['name']
+        player_full_name = row['full_name']
         dprint("Adding player[%d]: name=%s full_name=%s" % (player_num,
                                                             player_name,
                                                             player_full_name))
@@ -364,8 +422,7 @@ def init_players():
 
 
 def get_max_round_no():
-    global RoundList
-
+    #global RoundList
     # try it an alternative way
     rnd_nos = [rnd.num for rnd in RoundList.itervalues()]
     max_rnd_no = max(rnd_nos)
@@ -376,28 +433,49 @@ def get_max_round_no():
 def init_rounds():
     global DBc
     global RoundList
+    global MoneyRoundList
     global RoundDetailList
+    global MoneyRoundDetailList
 
     dprint("Initializing Disc Golf Rounds ...")
     RoundList = {}
     for row in db_cmd_exec('SELECT * FROM rounds'):
-        (round_num, course_num, rdate, mround1, mround2, mround3) = row[0:6]
-        dprint("Adding round[%d]: course_num=%s, rnd_date=%s, " % \
-               (round_num, course_num, rdate) + \
-               "mround[]=%d/%d/%d" % (mround1, mround2, mround3))
-        rnd = Round(round_num, course_num, rdate, mround1, mround2, mround3)
+        round_num = row['num']
+        course_num = row['course_num']
+        rdate = row['rdate']
+        dprint("Adding round[%d]: course_num=%s, rnd_date=%s" % \
+               (round_num, course_num, rdate))
+        rnd = Round(round_num, course_num, rdate)
         RoundList[round_num] = rnd
         dprint("Added:", rnd)
+    dprint("Initializing Disc Golf Money Rounds ...")
+    MoneyRoundList = {}
+    for row in db_cmd_exec('SELECT * FROM money_rounds'):
+        round_num = row['round_num']
+        mround1 = row['mround1']
+        mround2 = row['mround2']
+        mround3 = row['mround3']
+        dprint("Adding money round[%d]: mrounds = %d/%d/%d" % \
+               (round_num, mround1, mround2, mround3))
+        mrnd = MoneyRound(round_num, mround1, mround2, mround3)
+        MoneyRoundList[round_num] = mrnd
+        dprint("Added:", mrnd)
     dprint("Initializing Disc Golf Round Details ...")
     RoundDetailList = []
     for row in db_cmd_exec('SELECT * from round_details'):
-        (round_num, player_num,
-         fscore, bscore,
-         acnt, ecnt, aecnt,
-         fscore_num, fscore_den,
-         bscore_num, bscore_den,
-         oscore_num, oscore_den,
-         mrnd1, mrnd2, mrnd3) = row[0:16]
+        round_num = row['round_num']
+        player_num = row['player_num']
+        fscore = row['fscore']
+        bscore = row['bscore']
+        acnt = row['acnt']
+        ecnt = row['ecnt']
+        aecnt = row['aecnt']
+        fscore_num = row['calc_fscore_numerator']
+        fscore_den = row['calc_fscore_denominator']
+        bscore_num = row['calc_bscore_numerator']
+        bscore_den = row['calc_bscore_denominator']
+        oscore_num = row['calc_oscore_numerator']
+        oscore_den = row['calc_oscore_denominator']
         dprint("Adding round detail: " +
                "rnd_num=%d, p_num=%d, " % (round_num, player_num) +
                "fscore=%d, bscore=%d, " % (fscore, bscore) +
@@ -405,16 +483,32 @@ def init_rounds():
                (acnt, ecnt, aecnt,
                 fscore_num, fscore_den,
                 bscore_num, bscore_den,
-                oscore_num, oscore_den) + \
-               "Money=%s/%s/%s" % (mrnd1, mrnd2, mrnd3))
+                oscore_num, oscore_den))
         rd = RoundDetail(round_num, player_num, fscore, bscore,
                          acnt, ecnt, aecnt,
                          MyFraction(fscore_num, fscore_den),
                          MyFraction(bscore_num, bscore_den),
-                         MyFraction(oscore_num, oscore_den),
-                         Money(0, mrnd1), Money(0, mrnd2), Money(0, mrnd3))
+                         MyFraction(oscore_num, oscore_den))
         RoundDetailList.append(rd)
         dprint("Added:", rd)
+    dprint("Initializing Disc Golf Money Round Details ...")
+    MoneyRoundDetailList = []
+    for row in db_cmd_exec('SELECT * from money_round_details'):
+        round_num = row['round_num']
+        player_num = row['player_num']
+        mrnd1 = row['money_rnd1_winnings']
+        mrnd2 = row['money_rnd2_winnings']
+        mrnd3 = row['money_rnd3_winnings']
+        dprint("Adding money round detail: " +
+               "rnd_num=%d, p_num=%d, " % (round_num, player_num) + \
+               "Money=%s/%s/%s" % (mrnd1, mrnd2, mrnd3))
+        mrd = MoneyRoundDetail(round_num,
+                               player_num,
+                               Money(0, mrnd1),
+                               Money(0, mrnd2),
+                               Money(0, mrnd3))
+        MoneyRoundDetailList.append(mrd)
+        dprint("Added:", mrd)
 
 
 def init_db():
@@ -425,6 +519,7 @@ def init_db():
 
     dprint("Initializing the Database (%s) ..." % DB_PATH)
     DBConn = sqlite3.connect(DB_PATH)
+    DBConn.row_factory = sqlite3.Row
     DBc = DBConn.cursor()
     # now read our DB tables into Python objects
     init_courses()
@@ -450,13 +545,11 @@ def add_round(rnd, rd_list):
         dprint(rd)
     db_cmd_exec('''INSERT INTO rounds(num,
                                       course_num,
-                                      rdate,
-                                      mround1,mround2,mround3)
-                   VALUES(%d,%d,"%s",%d,%d,%d)''' % \
+                                      rdate)
+                   VALUES(%d,%d,"%s")''' % \
                 (rnd.num,
                  rnd.course_num,
-                 rnd.rdate.strftime("%m/%d/%Y"),
-                 rnd.mround1, rnd.mround2, rnd.mround3))
+                 rnd.rdate.strftime("%m/%d/%Y")))
     for rd in rd_list:
         if rnd.num != rd.round_num:
             raise Exception("Internal Error: Round Number mismatch!")
@@ -468,20 +561,14 @@ def add_round(rnd, rd_list):
                                                  calc_bscore_numerator,
                                                  calc_bscore_denominator,
                                                  calc_oscore_numerator,
-                                                 calc_oscore_denominator,
-                                                 money_rnd1_winnings,
-                                                 money_rnd2_winnings,
-                                                 money_rnd3_winnings)
-               VALUES(%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)''' % \
+                                                 calc_oscore_denominator)
+               VALUES(%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)''' % \
                     (rd.round_num, rd.player_num,
                      rd.fscore, rd.bscore,
                      rd.acnt, rd.ecnt, rd.aecnt,
                      rd.calc_fscore.numerator, rd.calc_fscore.denominator,
                      rd.calc_bscore.numerator, rd.calc_bscore.denominator,
-                     rd.calc_oscore.numerator, rd.calc_oscore.denominator,
-                     rd.moola_rnd1.AsCents(),
-                     rd.moola_rnd2.AsCents(),
-                     rd.moola_rnd3.AsCents()))
+                     rd.calc_oscore.numerator, rd.calc_oscore.denominator))
 
 
 def modify_round(rnd, rd_list):
@@ -493,10 +580,9 @@ def modify_round(rnd, rd_list):
         dprint(rd)
     dprint("Tryig to udate DB for:", rnd)
     db_cmd_exec('''UPDATE rounds
-                   SET course_num=%d,rdate="%s",mround1=%d,mround2=%d,mround3=%d
+                   SET course_num=%d,rdate="%s"
                    WHERE num=%d''' % \
-                (rnd.course_num, rnd.rdate.strftime("%m/%d/%Y"),
-                 rnd.mround1, rnd.mround2, rnd.mround3, rnd.num))
+                (rnd.course_num, rnd.rdate.strftime("%m/%d/%Y"), rnd.num))
     for rd in rd_list:
         dprint("Trying to update DB for:", rd)
         db_cmd_exec('''UPDATE round_details
@@ -507,20 +593,60 @@ def modify_round(rnd, rd_list):
                            calc_bscore_numerator=%d,
                            calc_bscore_denominator=%d,
                            calc_oscore_numerator=%d,
-                           calc_oscore_denominator=%d,
-                           money_rnd1_winnings=%d,
-                           money_rnd2_winnings=%d,
-                           money_rnd3_winnings=%d
+                           calc_oscore_denominator=%d
                        WHERE round_num=%d AND player_num=%d''' % \
                     (rd.fscore, rd.bscore,
                      rd.acnt, rd.ecnt, rd.aecnt,
                      rd.calc_fscore.numerator, rd.calc_fscore.denominator,
                      rd.calc_bscore.numerator, rd.calc_bscore.denominator,
                      rd.calc_oscore.numerator, rd.calc_oscore.denominator,
-                     rd.moola_rnd1.AsCents(),
-                     rd.moola_rnd2.AsCents(),
-                     rd.moola_rnd3.AsCents(),
                      rd.round_num, rd.player_num))
+
+def add_money_round(mrnd, mrd_list):
+    '''Add the specified round and list of round details to the DB'''
+    dprint("Adding to DB:", mrnd)
+    db_cmd_exec('''INSERT INTO money_rounds(round_num, mround1,mround2,mround3)
+                   VALUES(%d,%d,%d,%d)''' % \
+                (mrnd.round_num,
+                 mrnd.mrounds[0], mrnd.mrounds[1], mrnd.mrounds[2]))
+    for mrd in mrd_list:
+        dprint("Adding detail:", mrd)
+        if mrnd.round_num != mrd.round_num:
+            raise Exception("Internal Error: Round Number mismatch!")
+        db_cmd_exec('''INSERT INTO money_round_details(round_num,
+                                                       player_num,
+                                                       money_rnd1_winnings,
+                                                       money_rnd2_winnings,
+                                                       money_rnd3_winnings)
+                       VALUES(%d,%d,%d,%d,%d)''' % \
+                    (mrd.round_num, mrd.player_num,
+                     mrd.moola_rnd[0].AsCents(),
+                     mrd.moola_rnd[1].AsCents(),
+                     mrd.moola_rnd[2].AsCents()))
+
+
+def modify_money_round(mrnd, mrd_list):
+    '''
+    Modify the specified round and list of round details in the DB
+    '''
+    dprint("Modifying DB:", mrnd)
+    dprint("Tryig to udate DB for:", mrnd)
+    db_cmd_exec('''UPDATE money_rounds
+                   SET mround1=%d,mround2=%d,mround3=%d
+                   WHERE round_num=%d''' % \
+                (mrnd.mrounds[0], mrnd.mrounds[1], mrnd.mrounds[2],
+                 mrnd.round_num))
+    for mrd in mrd_list:
+        dprint("Trying to update DB for:", mrd)
+        db_cmd_exec('''UPDATE money_round_details
+                       SET money_rnd1_winnings=%d,
+                           money_rnd2_winnings=%d,
+                           money_rnd3_winnings=%d
+                       WHERE round_num=%d AND player_num=%d''' % \
+                    (mrd.moola_rnd[0].AsCents(),
+                     mrd.moola_rnd[1].AsCents(),
+                     mrd.moola_rnd[2].AsCents(),
+                     mrd.round_num, mrd.player_num))
 
 def round_details_equal(rd_list1, rd_list2):
     dprint("comparing two round detail lists with %d items;" % len(rd_list1))
@@ -540,7 +666,7 @@ def round_details_equal(rd_list1, rd_list2):
         dprint("Comparing:", rd1)
         dprint("With:     ", rd2)
         r = (rd1 != rd2)
-        dprint("Comparison result:", r)
+        dprint("Comparison result of (rd1 != rd2):", r)
         if rd1 != rd2:
             dprint("Item lists unequal", rd1, ", ", rd2)
             return False

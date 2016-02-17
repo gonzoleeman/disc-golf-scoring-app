@@ -7,6 +7,7 @@ List Control Customizations
 from utils import dprint
 from opts import opts
 from money import Money, money_from_string
+from wx.lib.pubsub import Publisher as pub
 
 import wx
 import wx.lib.mixins.listctrl as wxlc
@@ -138,6 +139,7 @@ class AutoWidthListEditCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
         * a decimal point
         * two more digits
         '''
+        dprint("Looking for money item in row=%d, col=%d" % (row, col))
         field_str = self.GetItem(row, col).GetText()
         dprint("Found money item[row=%d, col=%d] = '%s'" % \
                (row, col, field_str))
@@ -189,7 +191,7 @@ class AutoWidthListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
             self.InsertStringItem(data_idx, d2s(cfmt, data[0]))
             for col_idx in range(1, self.num_columns):
                 cfmt = self.itemColumnFmt[col_idx]
-                dprint("Width List: Filling col=%d row=%d, key=%d, fmt=%s:" % \
+                dprint("With List: Filling col=%d row=%d, key=%d, fmt=%s:" % \
                    (col_idx, data_idx, key, cfmt), data[col_idx])
                 self.SetStringItem(data_idx, col_idx, d2s(cfmt, data[col_idx]))
             self.SetItemData(data_idx, key)
@@ -209,7 +211,6 @@ class AutoWidthCheckListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
                              style=wx.LC_REPORT|wx.CONTROL_CHECKED)
         wxlc.ListCtrlAutoWidthMixin.__init__(self)
         wxlc.CheckListCtrlMixin.__init__(self)
-        self.Bind(wx.EVT_LIST_COL_CLICK, self.OnCheckItem)
         wxlc.ColumnSorterMixin.__init__(self, 1)
         self.items_checked = {}
         self.item_check_count = 0
@@ -240,4 +241,4 @@ class AutoWidthCheckListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
             self.item_check_count += 1
         else:
             self.item_check_count -= 1
-
+        pub.sendMessage("ITEM CHECK UPDATE", self.item_check_count)

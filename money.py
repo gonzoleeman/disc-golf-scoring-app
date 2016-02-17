@@ -11,6 +11,10 @@ __author__ = 'Lee Duncan'
 __version__ = '1.0'
 
 
+
+MONEY_STR_WIDTH=5
+
+
 class Money:
     def __init__(self, dollars=0, cents=0):
         d = int(dollars)
@@ -67,6 +71,9 @@ class Money:
     def AsCents(self):
         return (100 * self.dollars) + self.cents
 
+    def IsZero(self):
+        return self.dollars == 0 and self.cents == 0
+
 
 
 def money_from_string(money_str):
@@ -83,4 +90,10 @@ def money_from_string(money_str):
     c = int(c_str) if len(c_str) else 0
     res = Money(d, c)
     dprint("Money string '%s' -> $%s" % (money_str, res))
+    return res
+
+def money_to_string(m):
+    money_str_fmt = '$%%%ds' % MONEY_STR_WIDTH
+    res = money_str_fmt % m
+    dprint("Money '%s' to Money String '%s'" % (m, res))
     return res

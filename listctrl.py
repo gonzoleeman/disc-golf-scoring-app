@@ -184,14 +184,14 @@ class AutoWidthListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
         self.DeleteAllItems()
         self.itemDataMap = item_data
         data_idx = 0
-        for key, data in self.itemDataMap.items():
+        for key, data in self.itemDataMap.iteritems():
             cfmt = self.itemColumnFmt[0]
             dprint("With List: Filling in col=0 row=%d, key=%d, fmt=%s:" % \
-                   (data_idx, key, cfmt), data)
+                   (data_idx, key, cfmt), data[0])
             self.InsertStringItem(data_idx, d2s(cfmt, data[0]))
             for col_idx in range(1, self.num_columns):
                 cfmt = self.itemColumnFmt[col_idx]
-                dprint("With List: Filling col=%d row=%d, key=%d, fmt=%s:" % \
+                dprint("With List: Filling in col=%d row=%d, key=%d, fmt=%s:" % \
                    (col_idx, data_idx, key, cfmt), data[col_idx])
                 self.SetStringItem(data_idx, col_idx, d2s(cfmt, data[col_idx]))
             self.SetItemData(data_idx, key)

@@ -426,13 +426,13 @@ class MoneyRoundDetailsFrame(wx.Frame):
         Return True if data was legal,
         Else return False and leave data partially updated
         '''
-        dprint("*** GetDataFromFrameIfNeeded (money rounds): form_up_to_date=%s" % \
-               self.data_from_form_up_to_date )
+        dprint("*** GetDataFromFrameIfNeeded (money rounds): " + \
+               "form_up_to_date=%s" % self.data_from_form_up_to_date)
         if self.data_from_form_up_to_date:
             return True
-        # get data from list into
         ####
-        dprint("Before Update:", self.this_round)
+        # get data from list into
+        ####        dprint("Before Update:", self.this_round)
         mr1 = self.mf[0].GetSelection()
         mr2 = self.mf[1].GetSelection()
         mr3 = self.mf[2].GetSelection()

@@ -17,6 +17,7 @@ import score
 from money import Money
 
 
+
 class ScoreResultsFrame(wx.Frame):
     '''
     This is the report frame, where results over a period of time are
@@ -101,6 +102,21 @@ class ScoreResultsFrame(wx.Frame):
         hbox2.Add(self.results_list, 1, wx.EXPAND|wx.ALL, border=10)
         vbox.Add(hbox2, proportion=1, flag=wx.LEFT|wx.RIGHT|wx.EXPAND)
         ################################################################
+        vbox.AddSpacer(15)
+        hbox3 = wx.BoxSizer(wx.HORIZONTAL)
+        done_button = wx.Button(panel, label='Done')
+        # XXX maybe this should be a menu option?
+        print_button = wx.Button(panel, label='Print')
+        print_button.Disable()          # XXX for now
+        self.Bind(wx.EVT_BUTTON, self.OnDone, source=done_button)
+        self.Bind(wx.EVT_BUTTON, self.OnPrint, source=print_button)
+        hbox3.AddSpacer(10)
+        hbox3.Add(done_button)
+        hbox3.AddStretchSpacer(1)
+        hbox3.Add(print_button)
+        hbox3.AddSpacer(10)
+        vbox.Add(hbox3, flag=wx.LEFT|wx.RIGHT|wx.EXPAND, border=10)
+        ################################################################
         panel.SetSizer(vbox)
         ################################################################
         pub.subscribe(self.OnNewRoundExists, "ROUND UPDATE")
@@ -108,6 +124,13 @@ class ScoreResultsFrame(wx.Frame):
 
     def MzKittyMsg(self):
         return "Amount for Mz Kitty: $%5s" % self.mz_kitty_amt
+
+    def OnPrint(self, e):
+        dprint("PRINT? Are you kidding?")
+
+    def OnDone(self, e):
+        dprint("All done!")
+        self.Close()
 
     def OnNewRoundExists(self, message):
         '''A "NEW ROUND" message has been received'''

@@ -5,6 +5,11 @@ Python script to present a Disc Golf GUI, that allows
 us to keep track of courses and holes on that course
 
 TO DO:
+    - Add tracking "weather" (as a free-form string) for each round?
+      Not really useful for the overall report, but might be good
+      for historical reasons? -- or could have a few choices for weather,
+      like "sunny/rainy", "temp", "wind"? Seems like a bit much.
+
     - ReportFrame needs a "done" button?
 
     - A Way to get directly to an existing money round, without having

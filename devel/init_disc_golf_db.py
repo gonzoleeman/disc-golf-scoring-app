@@ -21,6 +21,7 @@ import csv
 
 from opts import opts
 from utils import dprint
+from itertools import ifilter
 
 
 _DB_DIR = 'db'
@@ -101,6 +102,9 @@ def db_cmd_execd(c, cmd, data):
     dprint("sqlite3 cmd: '%s' with data:" % cmd, data)
     c.execute(cmd, data)
 
+def comment_filter(row):
+    '''return True if not a comment, for filtering out CSV comments'''
+    return row[0] != '#'
 
 def initialize_players(c, create_empty=False):
     if True:
@@ -116,9 +120,9 @@ def initialize_players(c, create_empty=False):
     if create_empty:
         return
     with open('preload/players.csv', 'rb') as fin:
-        dr = csv.DictReader(fin,
+        dr = csv.DictReader(ifilter(comment_filter, fin),
                             skipinitialspace=True,
-                            quoting=csv.QUOTE_NONNUMERIC)
+                            quoting=csv.QUOTE_NONE)
         for r in dr:
             t = (int(r['num']), r['name'], r['full_name'])
             db_cmd_execd(c, "INSERT INTO players VALUES(?,?,?)", t)
@@ -132,9 +136,9 @@ def initialize_courses(c, create_empty=False):
     if create_empty:
         return
     with open('preload/courses.csv', 'rb') as fin:
-        dr = csv.DictReader(fin,
+        dr = csv.DictReader(ifilter(comment_filter, fin),
                             skipinitialspace=True,
-                            quoting=csv.QUOTE_NONNUMERIC)
+                            quoting=csv.QUOTE_NONE)
         for r in dr:
             #dprint("Dict Result Row:", r)
             t = (int(r['num']), r['course_name'])
@@ -177,27 +181,27 @@ def initialize_rounds(c, create_empty=False):
         return
     ####
     with open('preload/rounds.csv', 'rb') as fin:
-        dr = csv.DictReader(fin,
+        dr = csv.DictReader(ifilter(comment_filter, fin),
                             skipinitialspace=True,
-                            quoting=csv.QUOTE_NONNUMERIC)
+                            quoting=csv.QUOTE_NONE)
         for r in dr:
             t = (int(r['num']), int(r['course_num']), r['rdate'])
             dprint("setting up 'rounds' tupple:", t)
             db_cmd_execd(c, "INSERT INTO rounds VALUES(?,?,?)", t)
     ####
     with open('preload/money_rounds.csv', 'rb') as fin:
-        dr = csv.DictReader(fin,
+        dr = csv.DictReader(ifilter(comment_filter, fin),
                             skipinitialspace=True,
-                            quoting=csv.QUOTE_NONNUMERIC)
+                            quoting=csv.QUOTE_NONE)
         for r in dr:
             t = (int(r['round_num']),
                  int(r['mround1']), int(r['mround2']), int(r['mround3']))
             db_cmd_execd(c, "INSERT INTO money_rounds VALUES(?,?,?,?)", t)
     ####
     with open('preload/round_details.csv', 'rb') as fin:
-        dr = csv.DictReader(fin,
+        dr = csv.DictReader(ifilter(comment_filter, fin),
                             skipinitialspace=True,
-                            quoting=csv.QUOTE_NONNUMERIC)
+                            quoting=csv.QUOTE_NONE)
         for r in dr:
             t = (int(r['round_num']), int(r['player_num']),
                  int(r['fstrokes']), int(r['bstrokes']),
@@ -207,12 +211,12 @@ def initialize_rounds(c, create_empty=False):
                  int(r['calc_bscore_numerator']),
                  int(r['calc_bscore_denominator']),
                  int(r['calc_oscore_numerator']),
-                 int(r['calc_bscore_denominator']))
+                 int(r['calc_oscore_denominator']))
             db_cmd_execd(c, "INSERT INTO round_details " + \
                          "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", t)
     ####
     with open('preload/money_round_details.csv', 'rb') as fin:
-        dr = csv.DictReader(fin,
+        dr = csv.DictReader(ifilter(comment_filter, fin),
                             skipinitialspace=True,
                             quoting=csv.QUOTE_NONE)
         for r in dr:

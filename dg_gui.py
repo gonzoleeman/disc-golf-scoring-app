@@ -5,6 +5,14 @@ Python script to present a Disc Golf GUI, that allows
 us to keep track of courses and holes on that course
 
 TO DO:
+    - Use environment variable to get printer to use and printer
+      options?
+
+    - Add Report button to save to file?
+
+    - Add Report option to display points in decimal (since the
+      fractions can get hard to read, e.g. "21 11/16"
+
     - On "Money Round" frame, and maybe on "List of Rounds" frame,
       show the number that played the money round (since it is not
       always the same as the number that played the regular round)
@@ -14,17 +22,10 @@ TO DO:
       for historical reasons? -- or could have a few choices for weather,
       like "sunny/rainy", "temp", "wind"? Seems like a bit much.
 
-    - ReportFrame needs a "done" button
-
-    - A Way to get directly to an existing money round, without having
-      to go through the round?
-    
-    - Disallow selection of report list (for now), since it adds no
-      value, and could be misleading. Some day, this might pop up details
-      about that person?
-
-    - Rename front 9 and back 9 fields to "strokes" instead of "score",
-      for God sake
+    - Need A Way to get directly to an existing money round, without
+      having to go through the round
+    - Handle Activation (double-click) of player in report list to
+      show details on that player (some day)
 
     - Disallow duplicate frames, e.g. for Round Scoring, choosing a round,
       money round scoring. more than one report frame should be ok
@@ -143,6 +144,12 @@ History:
           if the round try-number field is "7", and then assume
           the number of players is the number you find in the
           money round detail table for that money round.
+    version 1.17:
+        * Moved DB initialization into CSV tables, one file for each, in
+          the "preload" directory. First line of CSV file contains column
+          name. CSV comment lines are skipped.
+        * Added Done and Print buttons to report frame. Done just quites,
+          but "Print" actually works, piping text data to enscript
 '''
 
 
@@ -158,7 +165,7 @@ import rounds
 
 
 __author__ = "Lee Duncan"
-__version__ = "1.16"
+__version__ = "1.17"
 
 
 ################################################################

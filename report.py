@@ -6,17 +6,48 @@ reports for the Disc Golf database.
 
 import wx
 from wx.lib.pubsub import Publisher as pub
+import subprocess
 
-import rdb
-from utils import dprint
-from opts import opts
-import listctrl as lc
 import wxdate
 import money_rounds
 import score
 from money import Money
+import rdb
+from utils import dprint
+from opts import opts
+import listctrl as lc
 
 
+def format_table_line(items, hdg=False):
+    '''take the 13 enties in "items" and return them formatted for out table'''
+    dprint("*** format_table_line: items passed in (hdg=%s):" % hdg)
+    dprint(items)
+    str_fmt = '{:^8}' if hdg else '{:^+8}'
+    dprint("stroke format: '%s'" % str_fmt)
+    for i in range(13):
+        dprint("item[%d] (len %d): '%s'" % (i, len(str(items[i])), items[i]))
+    l = '{:<8}'.format(items[0]) + \
+        '{:^7}'.format(items[1]) + \
+        '{:^9}'.format(items[2]) + \
+        '{:^9}'.format(items[3]) + \
+        '{:^5}'.format(items[4]) + \
+        '{:^7}'.format(items[5]) + \
+        '{:^10}'.format(items[6]) + \
+        '{:^5}'.format(items[7]) + \
+        '{:^5}'.format(items[8]) + \
+        '{:^5}'.format(items[9]) + \
+        str_fmt.format(items[10]) + \
+        str_fmt.format(items[11]) + \
+        '{:>6}'.format(items[12])
+    dprint("Returning table line: /%s/" % l)
+    return l
+
+def format_table_dash_line(hdg_items):
+    dprint("format_table_dash_line")
+    hdg = []
+    for h in hdg_items:
+        hdg.append('-' * len(h))
+    return format_table_line(hdg, hdg=True)
 
 class ScoreResultsFrame(wx.Frame):
     '''
@@ -89,10 +120,12 @@ class ScoreResultsFrame(wx.Frame):
         #vbox.AddSpacer(15)
         hbox2 = wx.BoxSizer(wx.HORIZONTAL)
         self.results_list = lc.AutoWidthListCtrl(panel)
+        self.my_headings = [
+            'Name', 'Rounds', 'TtlPts', 'PPR',
+            'Aces', 'Eagles', 'Ace-Eagles',
+            '9-s', '18-s', '33-s', 'Best F9', 'Best B9', '$ Won']
         self.results_list.SetupListHdr(\
-            ['Name', 'Rounds', 'TtlPts', 'PPR',
-             'Aces', 'Eagles', 'Ace-Eagles',
-             '9-s', '18-s', '33-s', 'Best F9', 'Best B9', '$ Won'],
+            self.my_headings,
             [wx.LIST_FORMAT_LEFT, wx.LIST_FORMAT_CENTER] + \
             [wx.LIST_FORMAT_RIGHT] * 10 + [wx.LIST_FORMAT_CENTER],
             ['%s', '%d', '%5.2f', '%5.2f'] + \
@@ -107,7 +140,7 @@ class ScoreResultsFrame(wx.Frame):
         done_button = wx.Button(panel, label='Done')
         # XXX maybe this should be a menu option?
         print_button = wx.Button(panel, label='Print')
-        print_button.Disable()          # XXX for now
+        #print_button.Disable()          # XXX for now
         self.Bind(wx.EVT_BUTTON, self.OnDone, source=done_button)
         self.Bind(wx.EVT_BUTTON, self.OnPrint, source=print_button)
         hbox3.AddSpacer(10)
@@ -127,6 +160,34 @@ class ScoreResultsFrame(wx.Frame):
 
     def OnPrint(self, e):
         dprint("PRINT? Are you kidding?")
+        # generate a list of lines, to be printed
+        lines = []
+        lines.append(' ' * 20 + '*** Disc Golf Score Results -- by LeeMan ***')
+        lines.append('')
+        lines.append('Scores for Date Range: %s to %s' % \
+                     (self.start_rdate.strftime("%m/%d/%Y"),
+                      self.stop_rdate.strftime("%m/%d/%Y")))
+        lines.append('')
+        lines.append('Players found: %d              Rounds Found: %s' % \
+                     (self.match_count, self.round_count))
+        lines.append('')
+        lines.append(self.MzKittyMsg())
+        lines.append('')
+
+        lines.append(format_table_line(self.my_headings, True))
+        lines.append(format_table_dash_line(self.my_headings))
+        for data_item in self.item_data.itervalues():
+            lines.append(format_table_line(data_item))
+
+        pr_pipe = subprocess.Popen(['enscript', '-1', '-r',
+                                    '-b', 'DGDB|%W|Page $% of $=',
+                                    '-t', 'Disc Golf Score Results from DGDB'],
+                                   stdin=subprocess.PIPE).stdin
+        dprint("Document to be printed:")
+        for l in lines:
+            dprint('/%s/' % l)
+            print >>pr_pipe, l
+        pr_pipe.close()          # this shold make the command go away
 
     def OnDone(self, e):
         dprint("All done!")

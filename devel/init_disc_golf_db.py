@@ -17,6 +17,7 @@ import os
 import sys
 from optparse import OptionParser
 import sqlite3
+import csv
 
 from opts import opts
 from utils import dprint
@@ -33,92 +34,11 @@ __version__ = "1.2-wip"
 #
 # data for preloading the database
 #
-players_preload_list = [
-    # fields:
-    # 1. num -- autoincrement			** KEY **
-    # 2. name
-    # 3. full_name
-    (1, "Gary", "Gary Rogers"),           # 1
-    (2, "Pat", "Pat Olmstead"),           # 2
-    (3, "Charlie", "Charlie Amacher"),    # 3
-    (4, "Dick", "Dick Burdock"),          # 4
-    (5, "Gabe", "Gabe Miller"),           # 5
-    (6, "Dr Dave", "Dr Dave"),            # 6
-    (7, "John J", "John J"),              # 7
-    (8, "John U", "John U"),              # 8
-    (9, "Jonathon", "Jonathon Williams"), # 9
-    (10, "Rick", "Rick Miller"),          # 10
-    (11, "Lee", "Lee Duncan"),            # 11
-    (12, "Bill", "Bill ???"),             # 12
-    ]
-
-courses_preload_list = [
-    # fields:
-    # 1. num -- autoincrement			** KEY **
-    # 2. course_name
-    (1, "Dick's",),                     # 1
-    (2, "Charlie's",),                  # 2
-    (3, "Bill's",),                     # 3
-    (4, "Rick's",),                     # 4
-    (5, "Pat's",),                      # 5
-    ]
 
 
 #
 # optional data for creating round info
 #
-rounds_preload_list = [
-    # fields:
-    # 1. num -- autoincrement			** KEY **
-    # 2.  course_num (join from course.num)
-    # 3.   rdate
-    (1, 1, "1/10/2016"),                # Round 1: at Dick's
-    (2, 5, "1/24/2016"),                # Round 2: Pat's
-    ]
-
-money_rounds_preload_list = [
-    # fields:
-    # 1.  round_num (JOIN from rounds.num)	** KEY **
-    # 3.   mround1				- $ round 1 won on which pass?
-    # 4.    mround2				- $ round 2 won on which pass?
-    # 5.     mround3				- $ round 3 won on which pass?
-    (1, 1, 3, 0),               # Money Round At Round 1: [1, 3, None]
-    (2, 6, 7, 0),               # Money Round at Round 2: [6, 7, None]
-    ]
-
-round_details_preload_list = [
-    # fields:
-    # 1. round_num (JOIN from rounds.num)	\_ ** KEY **
-    # 2.  player_num (JOIN from player.num)	/
-    # 3.   fstrokes					- front score over/under
-    # 4.    bstrokes					- back score over/under
-    # 5.     acnt					- ace count
-    # 6.      ecnt					- eagle count
-    # 7.       aecnt				- ace-eagle count
-    # 8.        calc_fscore_numerator
-    # 9.         calc_fscore_denomiator
-    # 10.         calc_bscore_numerator
-    # 11.          calc_bscore_denomiator
-    # 12.           calc_oscore_numerator
-    # 13.            calc_oscore_denomiator
-    ################################################################
-    # for round 1: At Dicks's on 1/12/2016: 8 players
-    (1,  2, +1, +2, 1, 0, 0,  1, 1, 0, 1, 0, 1), # Pat
-    (1,  1, -1, -1, 0, 0, 0, 12, 1, 0, 1, 0, 1), # Gary
-    (1,  4, +1, +4, 0, 0, 0,  5, 1, 0, 1, 0, 1), # Dick
-    (1,  3, +2, +2, 0, 0, 0,  1, 2, 0, 1, 0, 1), # Charlie
-    (1, 12, +1,  0, 0, 0, 0,  1, 2, 0, 1, 0, 1), # Bill
-    (1, 11,  0,  0, 0, 0, 0,  1, 2, 0, 1, 0, 1), # Lee
-    (1,  7, +6, +4, 0, 0, 0,  1, 2, 0, 1, 0, 1), # John J
-    (1,  9, -1, +1, 0, 0, 0,  1, 2, 0, 1, 0, 1), # Jonathon
-    ################################################################
-    # for round 2 - At Pat's on 1/19/2016: 6 players
-    (2,  2,  0, -3, 0, 0, 0, 33, 1, 0, 1, 0, 1), # Pat
-    (2,  4,  0, +1, 0, 0, 0,  1, 4, 0, 1, 0, 1), # Dick
-    (2,  3, +4, -1, 0, 0, 0, 11, 1, 0, 1, 0, 1), # Charlie
-    (2, 12, -2, -1, 0, 0, 0,  4, 3, 0, 1, 0, 1), # Bill
-    (2, 11, -2, -2, 0, 0, 0,  5, 3, 0, 1, 0, 1), # Lee
-    ]
 
 
 money_round_details_preload_list = [
@@ -174,49 +94,55 @@ def ensure_no_db(force_db_rm_first=False):
 
 
 def db_cmd_exec(c, cmd):
-    dprint("sqlite3 cmd: %s" % cmd)
+    dprint("sqlite3 cmd: '%s'" % cmd)
     c.execute(cmd)
 
-def db_cmd_exec_many(c, cmd, data):
-    for d in data:
-        db_cmd_exec(c, cmd % d)
+def db_cmd_execd(c, cmd, data):
+    dprint("sqlite3 cmd: '%s' with data:" % cmd, data)
+    c.execute(cmd, data)
+
 
 def initialize_players(c, create_empty=False):
-    global players_preload_list
-    
-    dprint("Creating DB Table: 'players' ...")
-    db_cmd_exec(c, '''CREATE TABLE players (
+    if True:
+        db_cmd_exec(c, '''CREATE TABLE players (
+    			num INTEGER PRIMARY KEY,
+    			name CHAR(20),
+                        full_name CHAR(40))''')
+    else:
+        db_cmd_exec(c, '''CREATE TABLE players (
     			num INTEGER PRIMARY KEY AUTOINCREMENT,
     			name CHAR(20),
                         full_name CHAR(40))''')
     if create_empty:
         return
-    dprint("Initializing DB Table: 'players' ...")
-    db_cmd_exec_many(c, '''INSERT INTO players VALUES(%d, \"%s\",\"%s\")''',
-                     players_preload_list)
+    with open('preload/players.csv', 'rb') as fin:
+        dr = csv.DictReader(fin,
+                            skipinitialspace=True,
+                            quoting=csv.QUOTE_NONNUMERIC)
+        for r in dr:
+            t = (int(r['num']), r['name'], r['full_name'])
+            db_cmd_execd(c, "INSERT INTO players VALUES(?,?,?)", t)
+
 
 def initialize_courses(c, create_empty=False):
-    global courses_preload_list
-
     dprint("Creating DB Table: 'courses' ...")
     db_cmd_exec(c, '''CREATE TABLE courses (
-    				num INTEGER PRIMARY KEY AUTOINCREMENT,
+    				num INTEGER PRIMARY KEY,
     				name CHAR(20))''')
     if create_empty:
         return
-    dprint("Initializing DB Table: 'courses' ...")
-    db_cmd_exec_many(c, '''INSERT INTO courses VALUES (%d, \"%s\")''',
-                     courses_preload_list)
+    with open('preload/courses.csv', 'rb') as fin:
+        dr = csv.DictReader(fin,
+                            skipinitialspace=True,
+                            quoting=csv.QUOTE_NONNUMERIC)
+        for r in dr:
+            #dprint("Dict Result Row:", r)
+            t = (int(r['num']), r['course_name'])
+            db_cmd_execd(c, "INSERT INTO courses VALUES(?,?)", t)
 
 def initialize_rounds(c, create_empty=False):
-    global rounds_preload_list
-    global money_rounds_preload_list
-    global round_details_preload_list
-    global money_round_details_preload_list
-
-    dprint("Creating DB Table: 'rounds' ...")
     db_cmd_exec(c, '''CREATE TABLE rounds (
-    				  num INTEGER PRIMARY KEY AUTOINCREMENT,
+    				  num INTEGER PRIMARY KEY,
     				  course_num INTEGER,
                                   rdate DATE)''')
     db_cmd_exec(c, '''CREATE TABLE money_rounds (
@@ -250,25 +176,52 @@ def initialize_rounds(c, create_empty=False):
     if create_empty:
         return
     ####
-    dprint("Initializing DB Table: 'rounds' ...")
-    db_cmd_exec_many(c, '''INSERT INTO rounds
-                           VALUES (%d,%d,\"%s\")''',
-                     rounds_preload_list)
+    with open('preload/rounds.csv', 'rb') as fin:
+        dr = csv.DictReader(fin,
+                            skipinitialspace=True,
+                            quoting=csv.QUOTE_NONNUMERIC)
+        for r in dr:
+            t = (int(r['num']), int(r['course_num']), r['rdate'])
+            dprint("setting up 'rounds' tupple:", t)
+            db_cmd_execd(c, "INSERT INTO rounds VALUES(?,?,?)", t)
     ####
-    dprint("Initializing DB Table: 'money_rounds' ...")
-    db_cmd_exec_many(c, '''INSERT INTO money_rounds
-                           VALUES(%d,%d,%d,%d)''',
-                     money_rounds_preload_list)
+    with open('preload/money_rounds.csv', 'rb') as fin:
+        dr = csv.DictReader(fin,
+                            skipinitialspace=True,
+                            quoting=csv.QUOTE_NONNUMERIC)
+        for r in dr:
+            t = (int(r['round_num']),
+                 int(r['mround1']), int(r['mround2']), int(r['mround3']))
+            db_cmd_execd(c, "INSERT INTO money_rounds VALUES(?,?,?,?)", t)
     ####
-    dprint("Initializing DB Table: 'round_details' ...")
-    db_cmd_exec_many(c, '''INSERT INTO round_details
-                           VALUES (%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)''',
-                     round_details_preload_list)
+    with open('preload/round_details.csv', 'rb') as fin:
+        dr = csv.DictReader(fin,
+                            skipinitialspace=True,
+                            quoting=csv.QUOTE_NONNUMERIC)
+        for r in dr:
+            t = (int(r['round_num']), int(r['player_num']),
+                 int(r['fstrokes']), int(r['bstrokes']),
+                 int(r['acnt']), int(r['ecnt']), int(r['aecnt']),
+                 int(r['calc_fscore_numerator']),
+                 int(r['calc_fscore_denominator']),
+                 int(r['calc_bscore_numerator']),
+                 int(r['calc_bscore_denominator']),
+                 int(r['calc_oscore_numerator']),
+                 int(r['calc_bscore_denominator']))
+            db_cmd_execd(c, "INSERT INTO round_details " + \
+                         "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", t)
     ####
-    dprint("Initializing DB Table: 'money_round_details' ...")
-    db_cmd_exec_many(c, '''INSERT INTO money_round_details
-                           VALUES (%d,%d,%d,%d,%d)''',
-                     money_round_details_preload_list)
+    with open('preload/money_round_details.csv', 'rb') as fin:
+        dr = csv.DictReader(fin,
+                            skipinitialspace=True,
+                            quoting=csv.QUOTE_NONE)
+        for r in dr:
+            t = (int(r['round_num']), int(r['player_num']),
+                 int(r['money_rnd1_winnings']),
+                 int(r['money_rnd2_winnings']),
+                 int(r['money_rnd3_winnings']))
+            db_cmd_execd(c, "INSERT INTO money_round_details " + \
+                         "VALUES(?,?,?,?,?)", t)
 
 
 def initialize_db(skip_preload_flag):

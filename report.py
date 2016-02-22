@@ -22,25 +22,32 @@ def format_table_line(items, hdg=False):
     '''take the 13 enties in "items" and return them formatted for out table'''
     dprint("*** format_table_line: items passed in (hdg=%s):" % hdg)
     dprint(items)
-    str_fmt = '{:^8}' if hdg else '{:^+8}'
-    dprint("stroke format: '%s'" % str_fmt)
+    # set up an array of heading vs regular format for each column
+    line_fmt = [
+        ('{:<10s}', '{:<10s}'),
+        ('{:^7s}', '{:^7d}'),
+        ('{:>9s}', '{:>9.2f}'),
+        ('{:>9s}', '{:>9.2f}'),
+        ('{:^6s}', '{:^6d}'),
+        ('{:^7s}', '{:^7d}'),
+        ('{:^10s}', '{:^10d}'),
+        ('{:^5s}', '{:^5d}'),
+        ('{:^5s}', '{:^5d}'),
+        ('{:^5s}', '{:^5d}'),
+        ('{:^8s}', '{:^+8d}'),
+        ('{:^8s}', '{:^+8d}'),
+        ('{:>6s}', '{:>6s}')]
+    fmt_idx = 0 if hdg else 1
     for i in range(13):
-        dprint("item[%d] (len %d): '%s'" % (i, len(str(items[i])), items[i]))
-    l = '{:<8}'.format(items[0]) + \
-        '{:^7}'.format(items[1]) + \
-        '{:^9}'.format(items[2]) + \
-        '{:^9}'.format(items[3]) + \
-        '{:^5}'.format(items[4]) + \
-        '{:^7}'.format(items[5]) + \
-        '{:^10}'.format(items[6]) + \
-        '{:^5}'.format(items[7]) + \
-        '{:^5}'.format(items[8]) + \
-        '{:^5}'.format(items[9]) + \
-        str_fmt.format(items[10]) + \
-        str_fmt.format(items[11]) + \
-        '{:>6}'.format(items[12])
-    dprint("Returning table line: /%s/" % l)
-    return l
+        dprint("item[%d] (len %d):" % (i, len(str(items[i]))), items[i])
+        dprint("format for item: '%s'" % line_fmt[i][fmt_idx])
+    l = []
+    for i in range(13):
+        fmt_str = line_fmt[i][fmt_idx]
+        l.append(fmt_str.format(items[i]))
+    res = ''.join(l)
+    dprint("Returning table line: /%s/" % res)
+    return res
 
 def format_table_dash_line(hdg_items):
     dprint("format_table_dash_line")
@@ -174,7 +181,7 @@ class ScoreResultsFrame(wx.Frame):
         lines.append(self.MzKittyMsg())
         lines.append('')
 
-        lines.append(format_table_line(self.my_headings, True))
+        lines.append(format_table_line(self.my_headings, hdg=True))
         lines.append(format_table_dash_line(self.my_headings))
         for data_item in self.item_data.itervalues():
             lines.append(format_table_line(data_item))
@@ -215,7 +222,6 @@ class ScoreResultsFrame(wx.Frame):
         # SearchResult for that player
         matches_found = {k: rdb.SearchResult(v.num) \
                          for k,v in rdb.PlayerList.iteritems()}
-        self.item_data = {}
         # also keep track of unique rounds seen, using a key of
         # the round number, and data of True
         round_numbers_seen = {}
@@ -263,6 +269,7 @@ class ScoreResultsFrame(wx.Frame):
                            (round_num, try_no, add_amt))
                     self.mz_kitty_amt += add_amt
         # fill in item data for our GUI list: 1:1 from matches found
+        self.item_data = {}
         for pnum,sr in matches_found.iteritems():
             dprint("Found match[player_num=%d]:" % pnum, sr)
             if sr.rnd_cnt <= 0:
@@ -270,8 +277,9 @@ class ScoreResultsFrame(wx.Frame):
                 dprint("Skipping this player, since they did not play")
                 continue
             pname = rdb.PlayerList[sr.pnum].name
-            self.item_data[pnum] = (pname, sr.rnd_cnt, sr.TotalPoints(),
-                                    sr.PointsPerRound(),
+            self.item_data[pnum] = (pname, sr.rnd_cnt,
+                                    float(sr.TotalPoints()),
+                                    float(sr.PointsPerRound()),
                                     sr.acnt, sr.ecnt, sr.aecnt,
                                     sr.won_9s, sr.won_18s,
                                     sr.won_33s,

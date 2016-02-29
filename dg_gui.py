@@ -5,13 +5,15 @@ Python script to present a Disc Golf GUI, that allows
 us to keep track of courses and holes on that course
 
 TO DO:
-    - Use environment variable to get printer to use and printer
-      options?
+    - Report GUI:
+        - Print output should sort, perhaps on default column, or on column
+          being used by GUI?
 
-    - Add Report button to save to file?
+        - Add printer dialog for report printing
 
-    - Add Report option to display points in decimal (since the
-      fractions can get hard to read, e.g. "21 11/16"
+        - Make Control-P print the report output
+
+        - Add Report button to save to file?
 
     - On "Money Round" frame, and maybe on "List of Rounds" frame,
       show the number that played the money round (since it is not

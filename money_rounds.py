@@ -9,7 +9,7 @@ imply a money round.
 """
 
 import wx
-from wx.lib.pubsub import Publisher as pub
+from wx.lib.pubsub import pub
 
 import rdb
 from utils import dprint

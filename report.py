@@ -5,7 +5,7 @@ reports for the Disc Golf database.
 """
 
 import wx
-from wx.lib.pubsub import Publisher as pub
+from wx.lib.pubsub import pub
 import subprocess
 
 import wxdate
@@ -16,6 +16,7 @@ import rdb
 from utils import dprint
 from opts import opts
 import listctrl as lc
+from printer import MyPrintout
 
 
 def format_table_line(items, hdg=False):
@@ -69,6 +70,7 @@ class ScoreResultsFrame(wx.Frame):
         self.match_count = 0
         self.round_count = 0
         self.mz_kitty_amt = Money(0)
+        self.printout = MyPrintout(self)
 
     def MyStart(self, start_rdate, stop_rdate):
         dprint("ScoreResultsFrame:MyStart(%s, %s): entering" % \
@@ -147,7 +149,6 @@ class ScoreResultsFrame(wx.Frame):
         done_button = wx.Button(panel, label='Done')
         # XXX maybe this should be a menu option?
         print_button = wx.Button(panel, label='Print')
-        #print_button.Disable()          # XXX for now
         self.Bind(wx.EVT_BUTTON, self.OnDone, source=done_button)
         self.Bind(wx.EVT_BUTTON, self.OnPrint, source=print_button)
         hbox3.AddSpacer(10)
@@ -167,6 +168,11 @@ class ScoreResultsFrame(wx.Frame):
 
     def OnPrint(self, e):
         dprint("PRINT? Are you kidding?")
+        lines = self.GetOurData()
+        dprint("Calling print routine ...")
+        self.printout.PrintText(lines, "some title not used")
+
+    def GetOurData(self):
         # generate a list of lines, to be printed
         lines = []
         lines.append(' ' * 20 + '*** Disc Golf Score Results -- by LeeMan ***')
@@ -185,16 +191,8 @@ class ScoreResultsFrame(wx.Frame):
         lines.append(format_table_dash_line(self.my_headings))
         for data_item in self.item_data.itervalues():
             lines.append(format_table_line(data_item))
+        return lines
 
-        pr_pipe = subprocess.Popen(['enscript', '-1', '-r',
-                                    '-b', 'DGDB|%W|Page $% of $=',
-                                    '-t', 'Disc Golf Score Results from DGDB'],
-                                   stdin=subprocess.PIPE).stdin
-        dprint("Document to be printed:")
-        for l in lines:
-            dprint('/%s/' % l)
-            print >>pr_pipe, l
-        pr_pipe.close()          # this shold make the command go away
 
     def OnDone(self, e):
         dprint("All done!")

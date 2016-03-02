@@ -7,7 +7,7 @@ given date at a given course location.
 """
 
 import wx
-from wx.lib.pubsub import Publisher as pub
+from wx.lib.pubsub import pub
 import copy
 
 import rdb

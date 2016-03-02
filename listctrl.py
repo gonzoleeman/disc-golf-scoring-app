@@ -7,7 +7,7 @@ List Control Customizations
 from utils import dprint
 from opts import opts
 from money import Money, money_from_string
-from wx.lib.pubsub import Publisher as pub
+from wx.lib.pubsub import pub
 
 import wx
 import wx.lib.mixins.listctrl as wxlc

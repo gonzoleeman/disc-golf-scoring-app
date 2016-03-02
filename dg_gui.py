@@ -9,11 +9,9 @@ TO DO:
         - Print output should sort, perhaps on default column, or on column
           being used by GUI?
 
-        - Add printer dialog for report printing
+        - Figure out print dialog preview problems?
 
         - Make Control-P print the report output
-
-        - Add Report button to save to file?
 
     - On "Money Round" frame, and maybe on "List of Rounds" frame,
       show the number that played the money round (since it is not
@@ -152,6 +150,9 @@ History:
           name. CSV comment lines are skipped.
         * Added Done and Print buttons to report frame. Done just quites,
           but "Print" actually works, piping text data to enscript
+    version 1.18:
+        * now using wxPython 3.0 widgets -> pubsub had changed
+        * now using wxPrintout for printing, not "enscript"
 '''
 
 
@@ -167,7 +168,7 @@ import rounds
 
 
 __author__ = "Lee Duncan"
-__version__ = "1.17"
+__version__ = "1.18"
 
 
 ################################################################

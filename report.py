@@ -198,8 +198,8 @@ class ScoreResultsFrame(wx.Frame):
         dprint("All done!")
         self.Close()
 
-    def OnNewRoundExists(self, message):
-        '''A "NEW ROUND" message has been received'''
+    def OnNewRoundExists(self, round_no):
+        '''A "NEW ROUND" or "NEW MONEY ROUND" message has been received'''
         dprint("ScoreResultsFrame: A 'NEW ROUND' Message we received!")
         # re-read the database rounds and round_details into our
         # internal structures, since they have changed

@@ -241,4 +241,4 @@ class AutoWidthCheckListCtrl(wx.ListCtrl, wxlc.ListCtrlAutoWidthMixin,
             self.item_check_count += 1
         else:
             self.item_check_count -= 1
-        pub.sendMessage("ITEM CHECK UPDATE", self.item_check_count)
+        pub.sendMessage("ITEM CHECK UPDATE", count=self.item_check_count)

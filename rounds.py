@@ -73,7 +73,7 @@ class CurrentRoundsFrame(wx.Frame):
                                      label='Show/Edit Round')
         self.new_button = wx.Button(panel, id=wx.ID_NEW, label='New Round')
         self.show_button.Disable()
-        self.Bind(wx.EVT_BUTTON, self.OnNewRound, source=self.new_button)
+        self.Bind(wx.EVT_BUTTON, self.OnNewRoundButton, source=self.new_button)
         self.Bind(wx.EVT_BUTTON, self.OnShow, source=self.show_button)
         hbox3.AddSpacer(10)
         hbox3.Add(self.show_button)
@@ -114,8 +114,8 @@ class CurrentRoundsFrame(wx.Frame):
         dprint("Round List Deselected")
         self.show_button.Disable()
 
-    def OnNewRound(self, e):
-        dprint("*** New Round!")
+    def OnNewRoundButton(self, e):
+        dprint("*** New Round!;", e)
         RoundSetupFrame(self, title='Setup a New Round')
 
     def OnShow(self, e):
@@ -132,9 +132,9 @@ class CurrentRoundsFrame(wx.Frame):
         srf = RoundDetailsFrame(self, title='Examine a Round')
         srf.MyCreate(rnd, round_details, for_update=True)
 
-    def OnNewRoundExists(self, message):
+    def OnNewRoundExists(self, round_no):
         '''A "NEW ROUND" message has been received'''
-        dprint("Message Received: New Round: %s" % message)
+        dprint("Message Received: New Round:", round_no)
         rdb.init_rounds()
         self.SetRoundList()
         self.Show(True)
@@ -302,8 +302,8 @@ class RoundSetupFrame(wx.Frame):
         self.player_list.ToggleItem(e.Index)
         self.SetScoreButtonState()
 
-    def OnCheckItem(self, evt):
-        dprint("High level check item!:", evt)
+    def OnCheckItem(self, count):
+        dprint("High level check item!:", count)
         self.SetScoreButtonState()
 
     def OnStartScoring(self, e):
@@ -495,7 +495,7 @@ class RoundDetailsFrame(wx.Frame):
             lab = 'Create Money Round'
         self.mround_button.SetLabel(lab)
 
-    def OnNewMoneyRoundExists(self, message):
+    def OnNewMoneyRoundExists(self, round_no):
         dprint("New money round! change our button state, if needed")
         rdb.init_rounds()
         dprint("our round no:", self.this_round.num)
@@ -553,7 +553,7 @@ class RoundDetailsFrame(wx.Frame):
             self.SetNormalStatus("")
         rdb.commit_db()
         dprint("Updating parent GUI ...")
-        pub.sendMessage("ROUND UPDATE", self.this_round)
+        pub.sendMessage("ROUND UPDATE", round_no=self.this_round)
         self.is_edited = False
         self.is_committed = True
         self.SetCommitButtonState()

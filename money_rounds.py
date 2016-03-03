@@ -119,8 +119,8 @@ class MoneyRoundSetupFrame(wx.Frame):
         self.player_list.ToggleItem(e.Index)
         self.SetScoreButtonState()
 
-    def OnCheckItem(self, evt):
-        dprint("High level check item")
+    def OnCheckItem(self, count):
+        dprint("High level check item: count=", count)
         self.SetScoreButtonState()
 
     def OnStartMoneyScoring(self, e):
@@ -363,7 +363,7 @@ class MoneyRoundDetailsFrame(wx.Frame):
             rdb.add_money_round(self.this_mround, self.mround_details)
         rdb.commit_db()
         dprint("Updating parent GUI ...")
-        pub.sendMessage("MONEY ROUND UPDATE", self.this_round)
+        pub.sendMessage("MONEY ROUND UPDATE", round_no=self.this_round)
         self.is_edited = False
         self.Close()
 

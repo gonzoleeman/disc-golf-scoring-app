@@ -5,9 +5,11 @@ Python script to present a Disc Golf GUI, that allows
 us to keep track of courses and holes on that course
 
 TO DO:
+    - Add option to backup the DB. (Periodically, or on demand)
+
     - Report GUI:
         - Print output should sort, perhaps on default column, or on column
-          being used by GUI?
+          being used by GUI? -- might require a custom print control GUI?
 
         - Figure out print dialog preview problems?
 
@@ -49,8 +51,6 @@ TO DO:
     - Keep track of Aces, Eagles, and Ace-Eagles on a per-hole basis,
       e.g. have a drop-down radio-button list in the menu for each
       of the 18 hole -- hopefully not needed, except for by Gary
-
-    - Add option to backup the DB. (Periodically, or on demand)
 
     - Allow update of DB any time, but warn user that "calc is needed"
       if they have updated a front or back 9 score

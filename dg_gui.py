@@ -5,6 +5,8 @@ Python script to present a Disc Golf GUI, that allows
 us to keep track of courses and holes on that course
 
 TO DO:
+    - In "Money Round" setup GUI, should pre-select "ALL"
+
     - Add option to backup the DB. (Periodically, or on demand)
 
     - Report GUI:

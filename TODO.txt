@@ -1,0 +1,107 @@
+==========
+TODO Items
+==========
+
+- Bug [current rounds]: Sort by date is not correct.
+
+- In "Money Round" setup GUI, should pre-select "ALL"
+
+- Add option to backup the DB. (Periodically, or on demand)
+
+- Report GUI:
+    - Print output should sort, perhaps on default column, or on column
+      being used by GUI? -- might require a custom print control GUI?
+
+    - Figure out print dialog preview problems?
+
+    - Make Control-P print the report output
+
+- On "Money Round" frame, and maybe on "List of Rounds" frame,
+  show the number that played the money round (since it is not
+  always the same as the number that played the regular round)
+
+- Add tracking "weather" (as a free-form string) for each round?
+  Not really useful for the overall report, but might be good
+  for historical reasons? -- or could have a few choices for weather,
+  like "sunny/rainy", "temp", "wind"? Seems like a bit much.
+
+- Need A Way to get directly to an existing money round, without
+  having to go through the round
+- Handle Activation (double-click) of player in report list to
+  show details on that player (some day)
+
+- Disallow duplicate frames, e.g. for Round Scoring, choosing a round,
+  money round scoring. more than one report frame should be ok
+
+- on Commit, if no money round, as AreYouSure?
+
+- when updating a round, if the date is changed, make sure
+  the updated date does not match another record in the database.
+  But of course if the date is not changed, it will match
+  one and only one entry in the db, which corresponds to
+  this round.
+
+- Question: For counting 9-s, 18-s, and 33-s, what if, for example,
+  somebody ties on the front 9. Do both folks get 9-s?
+
+- update "Overall" column in RoundDetailsFrame when "Front 9"
+  or "Back 9" updated for "Round Scoring" frame, in real time
+
+- Add "Notes" to round detail entry? (for stuff DB doesn not cover?)
+
+- Keep track of Aces, Eagles, and Ace-Eagles on a per-hole basis,
+  e.g. have a drop-down radio-button list in the menu for each
+  of the 18 hole -- hopefully not needed, except for by Gary
+
+- Allow update of DB any time, but warn user that "calc is needed"
+  if they have updated a front or back 9 score
+
+- Sanity check; disallow new rounds in the future?
+  What about too far in the past? Probably not needed.
+
+- Break main status window into 2 parts: the first is the file
+  name of the database, and the 2nd is for error messages
+  (for which frame(s)?)
+
+- As soon as any field changed in the Scoring GUI, update
+  the status window to say "Edited"
+
+- handle "E" as the number "0" (i.e. "even") for score fields,
+  and display "E" instead of "+0" (enhancement). Display it this
+  way too? (Might require a new "type" of integer?)
+
+- display results graphically? Not sure what would be displayed yet.
+
+- quit guessing what new round number will be, and actually let
+  the database decide
+
+- in general, use use the DB as the backend, with transactions,
+  and never have to keep local copies of data? (may be slow?)
+- use DB transactions for changes, so we can just update the DB, then
+  throw it away if they say "no"
+
+- make setup window become the scoring window for a round,
+  instead of just replacing one window with the next (optimization)
+  (and likewise for the setup-report->report transition)
+
+- consider RETURN key in main window like Show/Edit button hit
+  (optimization) (i.e. Default?, Focus?)
+
+-------------------------------
+
+- Support alternate/new Database files (why?)
+
+- support DB modification for Courses and Players (some day),
+  so I do not have to use sqlite3 directly, or write a program, to
+  do this
+
+- support modifying a round to add or remove a player,
+  or even to remove a round? (not needed, and possibly evil)
+
+- Properly package for distribution (for who?)
+
+- implement real help? (like what?)
+
+- preferences? not really needed yet: nothing to configure/prefer
+  - e.g. which players are "usually there"
+  - size of windows?

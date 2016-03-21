@@ -1,0 +1,69 @@
+=======
+History
+=======
+
+version 1.18:
+    * now using wxPython 3.0 widgets -> pubsub had changed
+    * now using wxPrintout for printing, not "enscript"
+
+version 1.17:
+    * Moved DB initialization into CSV tables, one file for each, in
+      the "preload" directory. First line of CSV file contains column
+      name. CSV comment lines are skipped.
+    * Added Done and Print buttons to report frame. Done just quites,
+      but "Print" actually works, piping text data to enscript
+
+version 1.16:
+    * Now keeps track of mz kitty, on report screen, which
+      took quite a bit of re-arranging, including breaking
+      the round table into two: round and money round, and
+      doing the same for the round detail, now round detail and
+      money round detail. Assume that mz kitty only ges money
+      if the round try-number field is "7", and then assume
+      the number of players is the number you find in the
+      money round detail table for that money round.
+
+version 1.15:
+    * Now displaying report date range and record counts
+    * Date and course now saved/updated/displayed in scoring frame
+
+version 1.14:
+    * update report window if round(s) updated
+    * cleaned up money parsing debugging
+    * cleaned up money reporting bugs
+
+version 1.13: Many changes, including handling money rounds, and
+    displaying money won and best front and rear rounds. Also added
+    new date ranges for reports
+
+version 1.12: Now tracking front/rear/overall score separately, per
+    round played, for easier tracking of 9-s, 18-s, etc.
+
+version 1.11: Total score now a fraction. Round scores displayed
+    as "+N", or "-N". Also, now displaying "overall" score
+
+version 1.10: Now displays results, but no graph
+
+version 1.9: all works but getting result data!!!
+
+versoin 1.8: all works but commit?
+
+version 1.7: add starting "round list" window
+
+version 1.6: now scoring but not saving to the database
+    i.e. "Commit" not yet implemented
+
+version 1.5: have the scoring window populated now!
+
+version 1.4: getting closer: setting up a round correctly now
+
+version 1.3: trynig to get it arranged correctly
+
+Version 1.2: Now under git control. Added list selection
+    detection, list edit buttons, and button enable/disable
+
+Version 1.1: Now using a better list, with columns, and
+    faking out a ride database
+
+Version 1.0: menu bar present, hooked up, but on
+    Quit works
